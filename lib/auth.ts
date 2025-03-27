@@ -1,8 +1,8 @@
 // lib/auth.ts
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { AuthOptions } from 'next-auth'
 import { connectDB } from './mongodb'
 import { compare } from 'bcryptjs'
-import { AuthOptions } from 'next-auth'
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -17,17 +17,22 @@ export const authOptions: AuthOptions = {
         const user = await db.collection('users').findOne({ email: credentials!.email })
 
         if (user && await compare(credentials!.password, user.password)) {
-          return { id: user._id.toString(), email: user.email, name: user.name }
+          return {
+            id: user._id.toString(),
+            name: user.name,
+            email: user.email,
+          }
         }
+
         return null
       },
     }),
   ],
-  pages: {
-    signIn: '/login',
-  },
   session: {
     strategy: 'jwt',
+  },
+  pages: {
+    signIn: '/login',
   },
   callbacks: {
     async jwt({ token, user }) {

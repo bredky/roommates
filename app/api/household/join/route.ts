@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { connectDB } from '@/lib/mongodb'
 import { NextResponse } from 'next/server'
 import { ObjectId } from 'mongodb'
-import { connect } from 'http2'
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
