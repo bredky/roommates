@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { name } = await req.json()
+  const { name, cycle, customDays } = await req.json()
   const db = await connectDB()
 
   const users = db.collection('users')
@@ -26,7 +26,9 @@ export async function POST(req: Request) {
     name,
     householdId: user.householdId,
     assignedTo: null, // We'll handle assignment later
+    customDays: cycle === 'custom' ? customDays : null,
     completed: false,
+
   }
 
   const result = await tasks.insertOne(taskDoc)
