@@ -94,8 +94,65 @@ export default function DashboardPage() {
       setLoading(false)
     }
   }
+  type Task = {
+    _id: string
+    name: string
+    assignedTo?: {
+      name: string
+      email: string
+    }
+    completed: boolean
+  }
+  const [taskName, setTaskName] = useState('')
+  const [tasks, setTasks] = useState<Task[]>([])
+  const presetTasks = [
+  'Do the dishes',
+  'Clean kitchen surfaces',
+  'Take out the trash',
+  'Vacuum living room',
+  'Wipe down stove',
+  'Mop floors',
+  'Refill supplies',
+  'Clean fridge',
+  'Water plants'
+]
 
-  if (loadingUser) return <p>Loading your awesome dashboard...</p>
+  useEffect(() => {
+  if (inHousehold) fetchTasks()
+}, [inHousehold])
+
+  const fetchTasks = async () => {
+    const res = await fetch('/api/task/get')
+    const data = await res.json()
+    setTasks(data.tasks || [])
+}
+
+  const addTask = async (name: string) => {
+    const res = await fetch('/api/task/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+
+    if (res.ok) {
+      const { task } = await res.json()
+      setTasks(prev => [...prev, task])
+      setTaskName('')
+    }
+  }
+
+  const deleteTask = async (id: string) => {
+    const res = await fetch('/api/task/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: id }),
+    })
+
+  if (res.ok) setTasks(tasks.filter(t => t._id !== id))
+}
+
+
+  if (loadingUser) return <p>He left the pans out didn't he?</p>
 
   return (
     <div style={{
@@ -108,19 +165,18 @@ export default function DashboardPage() {
       <h1 style={{ fontSize: '2rem', marginBottom: 10 }}>
         👋 Hey {user?.name || 'Roomie'}!
       </h1>
-
+  
       {inHousehold ? (
         <div style={{
-          background: '#2e2e40',        // Slightly lighter than page background
+          background: '#2e2e40',
           padding: 20,
           borderRadius: 12,
           marginTop: 20,
           boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
         }}>
-        
           <h2>🏠 You're part of a household!</h2>
           <p>🔐 Your join code: <strong>{joinCode}</strong></p>
-
+  
           <h3 style={{ marginTop: 20 }}>🧑‍🤝‍🧑 Household Members:</h3>
           <ul>
             {members.map((m, i) => (
@@ -140,11 +196,11 @@ export default function DashboardPage() {
           color: '#ffffff'
         }}>
           <p>🧼 Looks like you’re not in a household yet.</p>
-
+  
           <button onClick={handleCreateHousehold} disabled={loading} style={{ marginRight: 10 }}>
             {loading ? 'Creating...' : '🎉 Create Household'}
           </button>
-
+  
           <input
             placeholder="🔑 Enter join code"
             value={inputCode}
@@ -157,6 +213,73 @@ export default function DashboardPage() {
           </button>
         </div>
       )}
+  
+      {inHousehold && (
+        <div style={{
+          marginTop: 40,
+          background: '#2b2b3d',
+          padding: 20,
+          borderRadius: 12,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+        }}>
+          <h2 style={{ marginBottom: 10 }}>📝 Household Tasks</h2>
+  
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: 20 }}>
+            {presetTasks.map((t, i) => (
+              <button
+                key={i}
+                onClick={() => addTask(t)}
+                style={{
+                  padding: '6px 12px',
+                  background: '#3d3d5c',
+                  color: '#fff',
+                  border: '1px solid #5a5a7a',
+                  borderRadius: 6,
+                  cursor: 'pointer'
+                }}
+              >
+                ➕ {t}
+              </button>
+            ))}
+          </div>
+  
+          <div style={{ marginBottom: 20 }}>
+            <input
+              placeholder="✍️ Custom task..."
+              value={taskName}
+              onChange={(e) => setTaskName(e.target.value)}
+              style={{ marginRight: 10, padding: '6px 8px' }}
+            />
+            <button onClick={() => addTask(taskName)} disabled={!taskName}>
+              Add Custom Task
+            </button>
+          </div>
+  
+          <h4 style={{ marginBottom: 10 }}>📋 Current Tasks:</h4>
+          <ul>
+            {tasks.map((t) => (
+              <li key={t._id} style={{ marginBottom: 8 }}>
+                ✅ <strong>{t.name}</strong>{' '}
+                {t.assignedTo?.name && <span>(Assigned to {t.assignedTo.name})</span>}
+                <button
+                  onClick={() => deleteTask(t._id)}
+                  style={{
+                    marginLeft: 10,
+                    background: '#ff4d4d',
+                    border: 'none',
+                    borderRadius: 4,
+                    color: 'white',
+                    padding: '4px 8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ❌ Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
-  )
+  )  
 }
