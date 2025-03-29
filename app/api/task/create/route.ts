@@ -29,7 +29,6 @@ export async function POST(req: Request) {
   // Get all active tasks in this household
   const allTasks = await tasks.find({
     householdId: user.householdId,
-    completed: false
   }).toArray()
 
   // Map userId -> weighted task load
