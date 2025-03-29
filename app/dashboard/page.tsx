@@ -101,6 +101,7 @@ export default function DashboardPage() {
       name: string
       email: string
     }
+    assignedAt: string
     completed: boolean
     cycle: 'weekly' | 'biweekly' | 'monthly' | 'indefinite' | 'custom'
     customDays?: number
@@ -165,6 +166,37 @@ const [customDays, setCustomDays] = useState<number | null>(null)
 
   if (res.ok) setTasks(tasks.filter(t => t._id !== id))
 }
+const getDays = (task: Task) => {
+  switch (task.cycle) {
+    case 'weekly': return 7;
+    case 'biweekly': return 14;
+    case 'monthly': return 30;
+    case 'custom': return task.customDays || 1;
+    default: return 1;
+  }
+}
+const markTaskDone = async (taskId: string) => {
+  const res = await fetch('/api/task/complete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskId }),
+  })
+
+  if (res.ok) {
+    const updatedTasks = tasks.map(t =>
+      t._id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
+    )
+    setTasks(updatedTasks)
+  }
+}
+const getDueDate = (task: Task) => {
+  const assignedAt = new Date(task.assignedAt)
+  const due = new Date(assignedAt)
+  due.setDate(assignedAt.getDate() + getDays(task))
+  return due.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const sessionUserEmail = user?.email || ''
 
 
   if (loadingUser) return <p>He left the pans out didn't he?</p>
@@ -181,6 +213,7 @@ const [customDays, setCustomDays] = useState<number | null>(null)
           👋 Hey {user?.name || 'Roomie'}!
         </h1>
     
+        {/* Household status */}
         {inHousehold ? (
           <div style={{
             background: '#2e2e40',
@@ -211,11 +244,9 @@ const [customDays, setCustomDays] = useState<number | null>(null)
             color: '#ffffff'
           }}>
             <p>🧼 Looks like you’re not in a household yet.</p>
-    
             <button onClick={handleCreateHousehold} disabled={loading} style={{ marginRight: 10 }}>
               {loading ? 'Creating...' : '🎉 Create Household'}
             </button>
-    
             <input
               placeholder="🔑 Enter join code"
               value={inputCode}
@@ -229,6 +260,7 @@ const [customDays, setCustomDays] = useState<number | null>(null)
           </div>
         )}
     
+        {/* Tasks section */}
         {inHousehold && (
           <div style={{
             marginTop: 40,
@@ -308,10 +340,7 @@ const [customDays, setCustomDays] = useState<number | null>(null)
                 )}
     
                 <div style={{ marginTop: 20 }}>
-                  <button
-                    onClick={addTask}
-                    disabled={cycle === 'custom' && !customDays}
-                  >
+                  <button onClick={addTask} disabled={cycle === 'custom' && !customDays}>
                     ✅ Add Task
                   </button>
                   <button
@@ -331,31 +360,90 @@ const [customDays, setCustomDays] = useState<number | null>(null)
     
             <h4 style={{ margin: '20px 0 10px' }}>📋 Current Tasks:</h4>
             <ul>
-              {tasks.map((t) => (
-                <li key={t._id} style={{ marginBottom: 8 }}>
-                  ✅ <strong>{t.name}</strong>{' '}
-                  {t.cycle && <em>({t.cycle === 'custom' ? `${t.customDays} day cycle` : t.cycle})</em>}{' '}
-                  {t.assignedTo?.name && <span>- Assigned to {t.assignedTo.name}</span>}
-                  <button
-                    onClick={() => deleteTask(t._id)}
-                    style={{
-                      marginLeft: 10,
-                      background: '#ff4d4d',
-                      border: 'none',
-                      borderRadius: 4,
-                      color: 'white',
-                      padding: '4px 8px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    ❌ Remove
-                  </button>
-                </li>
-              ))}
+              {tasks.map((t) => {
+                const assignedAt = new Date(t.assignedAt)
+                const days = t.cycle === 'weekly' ? 7
+                  : t.cycle === 'biweekly' ? 14
+                  : t.cycle === 'monthly' ? 30
+                  : t.cycle === 'custom' ? t.customDays || 1
+                  : 1
+                const deadline = new Date(assignedAt)
+                deadline.setDate(assignedAt.getDate() + days)
+                const now = new Date()
+                const isOverdue = !t.completed && now > deadline
+    
+                return (
+                  <li key={t._id} style={{
+                    marginBottom: 12,
+                    background: '#3a3a55',
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    listStyle: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    color: '#fff'
+                  }}>
+                    <strong style={{ fontSize: '1.1rem' }}>{t.name}</strong>
+    
+                    <div style={{ fontSize: '0.9rem', marginTop: 4 }}>
+                      👤 Assigned to: <strong>{t.assignedTo?.name || 'Unknown'}</strong>
+                    </div>
+    
+                    <div style={{ fontSize: '0.9rem', marginTop: 2 }}>
+                      ⏰ Due: <strong>{deadline.toLocaleDateString()}</strong>
+                    </div>
+    
+                    <div style={{ fontSize: '0.9rem', marginTop: 2 }}>
+                      {t.completed ? (
+                        <span style={{ color: 'limegreen' }}>✅ Completed</span>
+                      ) : isOverdue ? (
+                        <span style={{ color: 'orange' }}>⚠️ Overdue</span>
+                      ) : (
+                        <span style={{ color: 'skyblue' }}>🕒 In Progress</span>
+                      )}
+                    </div>
+    
+                    {!t.completed && user && t.assignedTo?.email === user.email && (
+                      <button
+                        onClick={() => markTaskDone(t._id)}
+                        style={{
+                          marginTop: 10,
+                          alignSelf: 'flex-start',
+                          background: '#4caf50',
+                          border: 'none',
+                          borderRadius: 4,
+                          color: 'white',
+                          padding: '4px 8px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✅ Mark as Done
+                      </button>
+                    )}
+    
+                    <button
+                      onClick={() => deleteTask(t._id)}
+                      style={{
+                        marginTop: 6,
+                        alignSelf: 'flex-start',
+                        background: '#ff4d4d',
+                        border: 'none',
+                        borderRadius: 4,
+                        color: 'white',
+                        padding: '4px 8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ❌ Remove
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         )}
       </div>
     )
+    
     
 }
