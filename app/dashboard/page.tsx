@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import DashboardHTML from '../api/components/DashboardHTML'
 
 type Member = {
   name: string
@@ -202,247 +203,31 @@ const sessionUserEmail = user?.email || ''
   if (loadingUser) return <p>He left the pans out didn't he?</p>
 
   return (
-      <div style={{
-        padding: 40,
-        fontFamily: 'Arial, sans-serif',
-        backgroundColor: '#1e1e2f',
-        color: '#f8f8f8',
-        minHeight: '100vh'
-      }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: 10 }}>
-          👋 Hey {user?.name || 'Roomie'}!
-        </h1>
-    
-        {/* Household status */}
-        {inHousehold ? (
-          <div style={{
-            background: '#2e2e40',
-            padding: 20,
-            borderRadius: 12,
-            marginTop: 20,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
-          }}>
-            <h2>🏠 You're part of a household!</h2>
-            <p>🔐 Your join code: <strong>{joinCode}</strong></p>
-    
-            <h3 style={{ marginTop: 20 }}>🧑‍🤝‍🧑 Household Members:</h3>
-            <ul>
-              {members.map((m, i) => (
-                <li key={i}>
-                  {m.name} ({m.email})
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <div style={{
-            background: '#3a3a55',
-            padding: 20,
-            borderRadius: 12,
-            marginTop: 20,
-            border: '1px solid #6f6f94',
-            color: '#ffffff'
-          }}>
-            <p>🧼 Looks like you’re not in a household yet.</p>
-            <button onClick={handleCreateHousehold} disabled={loading} style={{ marginRight: 10 }}>
-              {loading ? 'Creating...' : '🎉 Create Household'}
-            </button>
-            <input
-              placeholder="🔑 Enter join code"
-              value={inputCode}
-              onChange={(e) => setInputCode(e.target.value)}
-              disabled={loading}
-              style={{ marginLeft: 10, marginRight: 10 }}
-            />
-            <button onClick={handleJoinHousehold} disabled={loading || !inputCode}>
-              {loading ? 'Joining...' : '🚪 Join Household'}
-            </button>
-          </div>
-        )}
-    
-        {/* Tasks section */}
-        {inHousehold && (
-          <div style={{
-            marginTop: 40,
-            background: '#2b2b3d',
-            padding: 20,
-            borderRadius: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-          }}>
-            <h2 style={{ marginBottom: 10 }}>📝 Household Tasks</h2>
-    
-            {!showCycleSelector ? (
-              <>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: 20 }}>
-                  {presetTasks.map((t, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setSelectedTaskName(t)
-                        setShowCycleSelector(true)
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        background: '#3d3d5c',
-                        color: '#fff',
-                        border: '1px solid #5a5a7a',
-                        borderRadius: 6,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      ➕ {t}
-                    </button>
-                  ))}
-                </div>
-    
-                <div style={{ marginBottom: 20 }}>
-                  <input
-                    placeholder="✍️ Custom task..."
-                    value={taskName}
-                    onChange={(e) => setTaskName(e.target.value)}
-                    style={{ marginRight: 10, padding: '6px 8px' }}
-                  />
-                  <button
-                    onClick={() => {
-                      setSelectedTaskName(taskName)
-                      setShowCycleSelector(true)
-                    }}
-                    disabled={!taskName}
-                  >
-                    ➕ Add Custom Task
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div style={{ background: '#3a3a55', padding: 20, borderRadius: 12 }}>
-                <h3>🌀 How often should "{selectedTaskName}" repeat?</h3>
-                <select
-                  value={cycle}
-                  onChange={(e) => setCycle(e.target.value as any)}
-                  style={{ marginRight: 10, marginTop: 10 }}
-                >
-                  <option value="weekly">Weekly</option>
-                  <option value="biweekly">Biweekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="custom">Custom</option>
-                  <option value="indefinite">One-Time</option>
-                </select>
-    
-                {cycle === 'custom' && (
-                  <input
-                    type="number"
-                    placeholder="Enter # of days"
-                    value={customDays ?? ''}
-                    onChange={(e) => setCustomDays(parseInt(e.target.value))}
-                    min={1}
-                    style={{ marginLeft: 10 }}
-                  />
-                )}
-    
-                <div style={{ marginTop: 20 }}>
-                  <button onClick={addTask} disabled={cycle === 'custom' && !customDays}>
-                    ✅ Add Task
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowCycleSelector(false)
-                      setSelectedTaskName('')
-                      setCycle('weekly')
-                      setCustomDays(null)
-                    }}
-                    style={{ marginLeft: 10 }}
-                  >
-                    ❌ Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-    
-            <h4 style={{ margin: '20px 0 10px' }}>📋 Current Tasks:</h4>
-            <ul>
-              {tasks.map((t) => {
-                const assignedAt = new Date(t.assignedAt)
-                const days = t.cycle === 'weekly' ? 7
-                  : t.cycle === 'biweekly' ? 14
-                  : t.cycle === 'monthly' ? 30
-                  : t.cycle === 'custom' ? t.customDays || 1
-                  : 1
-                const deadline = new Date(assignedAt)
-                deadline.setDate(assignedAt.getDate() + days)
-                const now = new Date()
-                const isOverdue = !t.completed && now > deadline
-    
-                return (
-                  <li key={t._id} style={{
-                    marginBottom: 12,
-                    background: '#3a3a55',
-                    padding: '10px 14px',
-                    borderRadius: 8,
-                    listStyle: 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    color: '#fff'
-                  }}>
-                    <strong style={{ fontSize: '1.1rem' }}>{t.name}</strong>
-    
-                    <div style={{ fontSize: '0.9rem', marginTop: 4 }}>
-                      👤 Assigned to: <strong>{t.assignedTo?.name || 'Unknown'}</strong>
-                    </div>
-    
-                    <div style={{ fontSize: '0.9rem', marginTop: 2 }}>
-                      ⏰ Due: <strong>{deadline.toLocaleDateString()}</strong>
-                    </div>
-    
-                    <div style={{ fontSize: '0.9rem', marginTop: 2 }}>
-                      {t.completed ? (
-                        <span style={{ color: 'limegreen' }}>✅ Completed</span>
-                      ) : isOverdue ? (
-                        <span style={{ color: 'orange' }}>⚠️ Overdue</span>
-                      ) : (
-                        <span style={{ color: 'skyblue' }}>🕒 In Progress</span>
-                      )}
-                    </div>
-    
-                    {!t.completed && user && t.assignedTo?.email === user.email && (
-                      <button
-                        onClick={() => markTaskDone(t._id)}
-                        style={{
-                          marginTop: 10,
-                          alignSelf: 'flex-start',
-                          background: '#4caf50',
-                          border: 'none',
-                          borderRadius: 4,
-                          color: 'white',
-                          padding: '4px 8px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ✅ Mark as Done
-                      </button>
-                    )}
-    
-                    <button
-                      onClick={() => deleteTask(t._id)}
-                      style={{
-                        marginTop: 6,
-                        alignSelf: 'flex-start',
-                        background: '#ff4d4d',
-                        border: 'none',
-                        borderRadius: 4,
-                        color: 'white',
-                        padding: '4px 8px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      ❌ Remove
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
+    <DashboardHTML
+    user={user}
+    inHousehold={inHousehold}
+    joinCode={joinCode}
+    members={members}
+    inputCode={inputCode}
+    setInputCode={setInputCode}
+    handleCreateHousehold={handleCreateHousehold}
+    handleJoinHousehold={handleJoinHousehold}
+    loading={loading}
+    taskName={taskName}
+    setTaskName={setTaskName}
+    selectedTaskName={selectedTaskName}
+    setSelectedTaskName={setSelectedTaskName}
+    showCycleSelector={showCycleSelector}
+    setShowCycleSelector={setShowCycleSelector}
+    cycle={cycle}
+    setCycle={setCycle}
+    customDays={customDays}
+    setCustomDays={setCustomDays}
+    addTask={addTask}
+    tasks={tasks}
+    deleteTask={deleteTask}
+    markTaskDone={markTaskDone}
+  />
     )
     
     
