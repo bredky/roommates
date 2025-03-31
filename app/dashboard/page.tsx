@@ -177,6 +177,22 @@ const getDays = (task: Task) => {
   }
 }
 const markTaskDone = async (taskId: string) => {
+  const task = tasks.find(t => t._id === taskId)
+  if (!task) return
+
+  const assignedAt = new Date(task.assignedAt)
+  const days = task.cycle === 'weekly' ? 7
+    : task.cycle === 'biweekly' ? 14
+    : task.cycle === 'monthly' ? 30
+    : task.cycle === 'custom' ? task.customDays || 1
+    : 1
+
+  const durationMs = days * 24 * 60 * 60 * 1000
+  const deadline = new Date(assignedAt.getTime() + durationMs)
+  const now = new Date()
+  const isOverdue = now > deadline
+
+  // ✅ First: Mark the task as completed
   const res = await fetch('/api/task/complete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -188,6 +204,12 @@ const markTaskDone = async (taskId: string) => {
       t._id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
     )
     setTasks(updatedTasks)
+
+    // ✅ Only call reassignment route if the task is overdue
+    if (isOverdue) {
+      await fetch('/api/task/reassign', { method: 'POST' })
+      await fetchTasks() // 🔄 Refresh UI with new assignment
+    }
   }
 }
 const getDueDate = (task: Task) => {

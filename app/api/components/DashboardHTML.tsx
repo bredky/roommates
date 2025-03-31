@@ -227,10 +227,11 @@ export default function DashboardHTML(props: Props) {
                 {cycle === 'custom' && (
                   <input
                     type="number"
+                    step="0.001"
                     placeholder="Enter # of days"
                     value={customDays ?? ''}
-                    onChange={(e) => setCustomDays(parseInt(e.target.value))}
-                    min={1}
+                    onChange={(e) => setCustomDays(parseFloat(e.target.value))}
+                    min={0.001}
                     style={{ marginLeft: 10 }}
                   />
                 )}
@@ -285,8 +286,8 @@ export default function DashboardHTML(props: Props) {
                   : t.cycle === 'monthly' ? 30
                   : t.cycle === 'custom' ? t.customDays || 1
                   : 1
-                const deadline = new Date(assignedAt)
-                deadline.setDate(assignedAt.getDate() + days)
+                const durationMs = days * 24 * 60 * 60 * 1000
+                const deadline = new Date(assignedAt.getTime() + durationMs)  
                 const now = new Date()
                 const isOverdue = !t.completed && now > deadline
     
@@ -354,6 +355,26 @@ export default function DashboardHTML(props: Props) {
                     >
                       ❌ Remove
                     </button>
+                    <button
+                        onClick={() => {
+                            fetch('/api/task/reassign', { method: 'POST' })
+                            .then(res => res.json())
+                            .then(data => console.log('🔁 Reassign result:', data))
+                        }}
+                        style={{
+                            marginTop: 6,
+                        alignSelf: 'flex-start',
+                        background: 'yellow',
+                        border: 'none',
+                        borderRadius: 4,
+                        color: 'black',
+                        padding: '4px 8px',
+                        cursor: 'pointer'
+                        }}
+                        >
+                        🔁 Force Reassign Check (for testing)
+                    </button>
+
                   </li>
                 )
               })}
