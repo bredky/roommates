@@ -27,7 +27,7 @@ export async function GET() {
 
   const memberIds = household.members || []
 
-  const members = await users.find({ _id: { $in: memberIds } }).project({ name: 1, email: 1 }).toArray()
+  const members = await users.find({ _id: { $in: memberIds } }).project({ name: 1, email: 1, points: 1 }).toArray()
 
   return NextResponse.json({ members })
 }

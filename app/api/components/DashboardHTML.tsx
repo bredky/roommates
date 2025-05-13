@@ -5,10 +5,11 @@ import React from 'react'
 type Member = {
   name: string
   email: string
+  points: number
 }
 
 type Props = {
-  user: { name: string; email: string } | null
+  user: { name: string; email: string; points: number } | null
   inHousehold: boolean
   joinCode: string
   members: Member[]
@@ -125,8 +126,8 @@ export default function DashboardHTML(props: Props) {
             <ul>
               {members.map((m, i) => (
                 <li key={i}>
-                  {m.name} ({m.email})
-                </li>
+                {m.name} ({m.email}) — <strong>{m.points} pts</strong> {m.points >= 3 ? '⚠️' : ''}
+              </li>
               ))}
             </ul>
           </div>
@@ -355,26 +356,6 @@ export default function DashboardHTML(props: Props) {
                     >
                       ❌ Remove
                     </button>
-                    <button
-                        onClick={() => {
-                            fetch('/api/task/reassign', { method: 'POST' })
-                            .then(res => res.json())
-                            .then(data => console.log('🔁 Reassign result:', data))
-                        }}
-                        style={{
-                            marginTop: 6,
-                        alignSelf: 'flex-start',
-                        background: 'yellow',
-                        border: 'none',
-                        borderRadius: 4,
-                        color: 'black',
-                        padding: '4px 8px',
-                        cursor: 'pointer'
-                        }}
-                        >
-                        🔁 Force Reassign Check (for testing)
-                    </button>
-
                   </li>
                 )
               })}

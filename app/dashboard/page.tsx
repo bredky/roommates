@@ -6,10 +6,11 @@ import DashboardHTML from '../api/components/DashboardHTML'
 type Member = {
   name: string
   email: string
+  points: number
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string; points: number } | null>(null)
   const [joinCode, setJoinCode] = useState('')
   const [inputCode, setInputCode] = useState('')
   const [inHousehold, setInHousehold] = useState(false)
@@ -23,7 +24,7 @@ export default function DashboardPage() {
         const res = await fetch('/api/user/me')
         const data = await res.json()
 
-        setUser({ name: data.name, email: data.email })
+        setUser({ name: data.name, email: data.email, points: data.points || 0 })
 
         if (data.householdId) {
           setInHousehold(true)

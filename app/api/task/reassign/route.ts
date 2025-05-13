@@ -11,6 +11,7 @@ export async function POST() {
   const now = new Date()
   const msPerDay = 1000 * 60 * 60 * 24
 
+  // ✅ More precise, supports decimal durations
   const getDeadline = (task: any) => {
     const assignedAt = new Date(task.assignedAt)
     const days =
@@ -19,9 +20,15 @@ export async function POST() {
       task.cycle === 'monthly' ? 30 :
       task.cycle === 'custom' ? task.customDays || 1 :
       365 * 10
-    const deadline = new Date(assignedAt)
-    deadline.setDate(deadline.getDate() + days)
-    return deadline
+    return new Date(assignedAt.getTime() + days * msPerDay)
+  }
+
+  // ✅ Calculate overdue days
+  const getOverdueDays = (task: any) => {
+    if (task.completed) return 0
+    const deadline = getDeadline(task)
+    const msLate = now.getTime() - deadline.getTime()
+    return msLate > 0 ? Math.floor(msLate / msPerDay) + 1 : 0 // Always at least 1 if overdue
   }
 
   const sortedTasks = [...allTasks].sort((a, b) =>
@@ -35,9 +42,9 @@ export async function POST() {
     const deadline = getDeadline(task)
     const assignedUserId = task.assignedTo?.toString()
     const isCompleted = task.completed
-    const isOverdue = !isCompleted && now > deadline
+    const overdueDays = getOverdueDays(task)
 
-    // Case 1: Completed + deadline passed → reassign (skip previous assignee)
+    // ✅ Case 1: Completed but deadline passed → reassign (skip previous)
     if (isCompleted && now > deadline) {
       const householdUsers = await users.find({ householdId: task.householdId }).toArray()
       const workloadMap = new Map<string, number>()
@@ -85,20 +92,21 @@ export async function POST() {
       break
     }
 
-    // Case 2: Overdue + incomplete → give points
-    if (isOverdue) {
-      const overdueDays = Math.floor((now.getTime() - deadline.getTime()) / msPerDay)
-      if (overdueDays > 0) {
-        await users.updateOne(
-          { _id: new ObjectId(assignedUserId) },
-          { $inc: { points: overdueDays } }
-        )
-      }
-
+    // ✅ Case 2: Overdue + incomplete → add points
+    if (overdueDays > 0 && !isCompleted && assignedUserId) {
       const user = await users.findOne({ _id: new ObjectId(assignedUserId) })
+      if (!user) continue
 
-      // Case 3: If user has 3+ points → reassign (include previous assignee)
-      if (user && user.points >= 3) {
+      await users.updateOne(
+        { _id: user._id },
+        { $inc: { points: overdueDays } }
+      )
+
+      console.log(`➕ Added ${overdueDays} point(s) to user ${assignedUserId} for overdue task "${task.name}"`)
+
+      // ✅ Case 3: If user now has 3+ points → reassign (include previous)
+      const updatedUser = await users.findOne({ _id: user._id })
+      if (updatedUser && updatedUser.points >= 3) {
         const householdUsers = await users.find({ householdId: task.householdId }).toArray()
         const workloadMap = new Map<string, number>()
 

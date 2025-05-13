@@ -32,6 +32,7 @@ export async function GET() {
     name: user.name,
     email: user.email,
     householdId: user.householdId || null,
+    userpoints: user.points || 0,
     joinCode,
   })
 }
