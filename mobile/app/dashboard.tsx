@@ -187,195 +187,226 @@ export default function Dashboard() {
     setRefreshing(false)
   }
   
+  const activeTasks = tasks.filter((t: any) => !t.completed && t.assignedTo?.email === user?.email)
+  const completedTasks = tasks.filter((t: any) => t.completed && t.assignedTo?.email === user?.email)
+
+  const timeUntil = (deadline: Date) => {
+    const now = new Date()
+    const ms = deadline.getTime() - now.getTime()
+    const hours = Math.floor(ms / (1000 * 60 * 60))
+    if (hours >= 24) return `${Math.floor(hours / 24)}d`
+    return `${hours}h`
+  }
 
   return (
-    <ScrollView style={{ padding: 20, backgroundColor: '#1e1e2f', flex: 1 }} refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor="#fff" 
-        />
-      }>
-      <Text style={styles.header}>👋 Hey {user?.name || 'roomie'}!</Text>
-      {!inHousehold && (
-        <View style={styles.card}>
-            <Text style={styles.subHeader}>🧼 Join or Create a Household</Text>
+    <View style={{ flex: 1, backgroundColor: '#FFE600' }}>
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        contentContainerStyle={{ padding: 20 }}
+      >
+        {/* Header */}
+        <Text style={styles.welcome}>👋 Welcome, {user?.name || 'Roomie'}</Text>
 
-            <Button title="🎉 Create Household" onPress={handleCreateHousehold} />
+        <View style={styles.topRow}>
+          <Text style={styles.mascot}>🐱</Text>
 
-            <View style={{ flexDirection: 'row', marginTop: 10 }}>
-            <TextInput
-                placeholder="🔑 Enter join code"
-                value={inputCode}
-                onChangeText={setInputCode}
-                style={styles.input}
-            />
-            <Button title="🚪 Join" onPress={handleJoinHousehold} disabled={!inputCode.trim()} />
-            </View>
+          <View style={styles.leaderboard}>
+            <Text style={styles.leaderboardTitle}>Whose eating it</Text>
+            {members.map((m, i) => (
+              <View key={i} style={[styles.rankCard, i === 0 && styles.rankCardTop]}>
+                <View style={styles.rankCircle}>
+                  <Text style={styles.rankNumber}>{i + 1}</Text>
+                </View>
+                <View style={styles.initials}>
+                  <Text style={styles.initialsText}>
+                    {m.name
+                      ?.split(' ')
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.memberName}>{m.name === user?.name ? `${m.name} (You)` : m.name}</Text>
+                <Text style={styles.points}>{m.points || 0} pts</Text>
+              </View>
+            ))}
+          </View>
         </View>
+
+        {/* Tasks */}
+        <Text style={styles.sectionTitle}>📋 Your Tasks</Text>
+        {activeTasks.map((task) => {
+          const assignedAt = new Date(task.assignedAt)
+          const days =
+            task.cycle === 'weekly'
+              ? 7
+              : task.cycle === 'biweekly'
+              ? 14
+              : task.cycle === 'monthly'
+              ? 30
+              : task.customDays || 1
+          const deadline = new Date(assignedAt.getTime() + days * 24 * 60 * 60 * 1000)
+
+          return (
+            <View key={task._id} style={styles.taskCard}>
+              <TouchableOpacity onPress={() => markTaskDone(task._id)}>
+                <Text style={styles.action}>✅</Text>
+              </TouchableOpacity>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.taskName}>{task.name}</Text>
+                <Text style={styles.due}>Due in {timeUntil(deadline)}</Text>
+              </View>
+
+              <TouchableOpacity onPress={() => deleteTask(task._id)}>
+                <Text style={styles.action}>🗑️</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        })}
+
+        {/* Completed */}
+        {completedTasks.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>✅ Completed</Text>
+            {completedTasks.map((task) => (
+              <View key={task._id} style={[styles.taskCard, { opacity: 0.5 }]}>
+                <Text style={[styles.taskName, { flex: 1 }]}>{task.name}</Text>
+                <Text style={styles.due}>✔️</Text>
+              </View>
+            ))}
+          </>
         )}
+      </ScrollView>
 
-      {inHousehold && (
-        <View style={styles.card}>
-          <Text>🏠 You're part of a household!</Text>
-          <Text>🔐 Your join code: <Text style={{ fontWeight: 'bold' }}>{joinCode}</Text></Text>
-
-          <Text style={{ marginTop: 10, fontWeight: 'bold' }}>🧑‍🤝‍🧑 Members:</Text>
-          {members.map((m, i) => (
-            <Text key={i}>{m.name} ({m.email}) — {m.points || 0} pts {m.points >= 3 ? '⚠️' : ''}</Text>
-          ))}
-        </View>
-      )}
-
-      {inHousehold && (
-        <View style={styles.card}>
-          <Text style={styles.subHeader}>📝 Household Tasks</Text>
-          {!showCycleSelect ? (
-            <>
-              <View style={styles.taskGrid}>
-                {presetTasks.map((t, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={styles.taskBtn}
-                    onPress={() => {
-                      setSelectedTask(t)
-                      setShowCycleSelect(true)
-                    }}>
-                    <Text style={{ color: '#fff' }}>➕ {t}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View style={{ flexDirection: 'row', marginTop: 10 }}>
-                <TextInput
-                  placeholder="✍️ Custom task..."
-                  value={customTaskInput}
-                  onChangeText={setCustomTaskInput}
-                  style={styles.input}
-                />
-                <Button
-                  title="Add"
-                  onPress={() => {
-                    setSelectedTask(customTaskInput)
-                    setShowCycleSelect(true)
-                  }}
-                />
-              </View>
-            </>
-          ) : (
-            <View style={styles.card}>
-              <Text>🌀 How often should "{selectedTask}" repeat?</Text>
-              <Picker
-                selectedValue={cycle}
-                onValueChange={(val) => setCycle(val)}
-                style={{ backgroundColor: '#fff', marginBottom: 10 }}
-                >
-                <Picker.Item label="Weekly" value="weekly" />
-                <Picker.Item label="Biweekly" value="biweekly" />
-                <Picker.Item label="Monthly" value="monthly" />
-                <Picker.Item label="Custom" value="custom" />
-                <Picker.Item label="Indefinite" value="indefinite" />
-              </Picker>
-              {cycle === 'custom' && (
-                <TextInput
-                  placeholder="Enter # of days"
-                  value={customDays}
-                  onChangeText={setCustomDays}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              )}
-              <Button
-                title="✅ Add Task"
-                onPress={handleAddTask}
-                disabled={cycle === 'custom' && !customDays}
-              />
-              <Button
-                title="❌ Cancel"
-                onPress={() => {
-                  setShowCycleSelect(false)
-                  setSelectedTask('')
-                  setCycle('weekly')
-                  setCustomDays('')
-                }}
-              />
-            </View>
-          )}
-
-          <Text style={{ marginTop: 10, fontWeight: 'bold' }}>📋 Current Tasks:</Text>
-          {tasks.map((task) => {
-            const assignedAt = new Date(task.assignedAt)
-            const days = task.cycle === 'weekly' ? 7 : task.cycle === 'biweekly' ? 14 : task.cycle === 'monthly' ? 30 : task.customDays || 1
-            const deadline = new Date(assignedAt.getTime() + days * 24 * 60 * 60 * 1000)
-            const now = new Date()
-            const isOverdue = !task.completed && now > deadline
-
-            return (
-              <View key={task._id} style={styles.taskCard}>
-                <Text style={styles.taskTitle}>{task.name}</Text>
-                <Text>👤 Assigned to: {task.assignedTo?.name || 'Unknown'}</Text>
-                <Text>📅 Due: {deadline.toDateString()}</Text>
-                <Text>
-                  {task.completed ? '✅ Completed' : isOverdue ? '⚠️ Overdue' : '🕒 In Progress'}
-                </Text>
-                {!task.completed && task.assignedTo?.email === user?.email && (
-                  <Button title="✅ Done" onPress={() => markTaskDone(task._id)} />
-                )}
-                <Button title="❌ Remove" color="red" onPress={() => deleteTask(task._id)} />
-              </View>
-            )
-          })}
-        </View>
-      )}
-    </ScrollView>
+      {/* Footer Nav */}
+      <View style={styles.footer}>
+        <Text style={styles.icon}>🔍</Text>
+        <Text style={styles.icon}>📸</Text>
+        <Text style={[styles.icon, styles.activeIcon]}>🟡</Text>
+        <Text style={styles.icon}>🏠</Text>
+        <Text style={styles.icon}>⚙️</Text>
+      </View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  header: {
-    fontSize: 24,
-    color: 'white',
-    marginBottom: 10,
+  welcome: {
+    fontSize: 26,
+    color: '#000',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  subHeader: {
-    fontSize: 18,
-    color: 'white',
-    marginBottom: 10,
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 10,
   },
-  card: {
-    backgroundColor: '#2e2e40',
-    padding: 16,
-    borderRadius: 10,
-    marginTop: 20,
+  mascot: {
+    fontSize: 64,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 10,
+  leaderboard: {
     flex: 1,
   },
-  taskBtn: {
-    backgroundColor: '#3d3d5c',
-    padding: 8,
-    borderRadius: 6,
+  leaderboardTitle: {
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
   },
-  taskGrid: {
+  rankCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 8,
+    marginBottom: 10,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rankCardTop: {
+    backgroundColor: '#FFF7C0',
+  },
+  rankCircle: {
+    backgroundColor: '#FFD700',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankNumber: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  initials: {
+    backgroundColor: '#3ddc84',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initialsText: {
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  memberName: {
+    flex: 1,
+    fontWeight: '600',
+    color: '#333',
+  },
+  points: {
+    fontWeight: 'bold',
+    color: '#995300',
+  },
+  sectionTitle: {
+    color: '#111',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 10,
   },
   taskCard: {
-    backgroundColor: '#3a3a55',
-    padding: 12,
-    marginVertical: 8,
-    borderRadius: 8,
+    backgroundColor: '#FFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 10,
   },
-  taskTitle: {
-    fontWeight: 'bold',
+  taskName: {
+    color: '#000',
     fontSize: 16,
-    color: 'white',
+    fontWeight: '500',
+  },
+  due: {
+    color: '#666',
+    fontSize: 12,
+  },
+  action: {
+    fontSize: 22,
+    marginHorizontal: 10,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 18,
+    borderTopWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#000',
+  },
+  icon: {
+    color: '#fff',
+    fontSize: 24,
+  },
+  activeIcon: {
+    backgroundColor: '#FFE600',
+    color: '#000',
+    paddingHorizontal: 10,
+    borderRadius: 20,
   },
 })
