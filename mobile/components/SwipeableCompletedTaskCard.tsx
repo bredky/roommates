@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
   StyleSheet,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native'
 import { PanGestureHandler } from 'react-native-gesture-handler'
 import Animated, {
@@ -15,10 +16,12 @@ import Animated, {
 } from 'react-native-reanimated'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3
+const ACTION_OFFSET = 80
+const SWIPE_THRESHOLD = 50
 
 export default function SwipeableCompletedTaskCard({ task, onDelete }) {
   const translateX = useSharedValue(0)
+  const [activeAction, setActiveAction] = useState<'delete' | null>(null)
 
   const gestureHandler = useAnimatedGestureHandler({
     onStart: (_, ctx: any) => {
@@ -28,10 +31,12 @@ export default function SwipeableCompletedTaskCard({ task, onDelete }) {
       translateX.value = ctx.startX + event.translationX
     },
     onEnd: () => {
-      if (translateX.value > SWIPE_THRESHOLD) {
-        runOnJS(onDelete)(task._id)
+      if (translateX.value < -SWIPE_THRESHOLD) {
+        translateX.value = withTiming(-ACTION_OFFSET)
+        runOnJS(setActiveAction)('delete')
       } else {
         translateX.value = withTiming(0)
+        runOnJS(setActiveAction)(null)
       }
     },
   })
@@ -63,10 +68,24 @@ export default function SwipeableCompletedTaskCard({ task, onDelete }) {
 
   return (
     <View style={styles.outer}>
+      {/* Right Action (Delete) */}
       <View style={styles.rightAction}>
-        <Text style={styles.actionText}>🗑️</Text>
+        <TouchableOpacity
+          disabled={activeAction !== 'delete'}
+          onPress={() => {
+            console.log('❌ Button pressed for:', task.name)
+            onDelete(task._id)
+          }}
+          style={[
+            styles.actionButton,
+            { zIndex: 3, opacity: activeAction === 'delete' ? 1 : 0.3 },
+          ]}
+        >
+          <Text style={styles.actionText}>❌</Text>
+        </TouchableOpacity>
       </View>
 
+      {/* Main Task Card */}
       <PanGestureHandler onGestureEvent={gestureHandler}>
         <Animated.View style={[styles.card, animatedStyle]}>
           <Text style={styles.name}>{task.name}</Text>
@@ -93,12 +112,16 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    width: 80,
+    width: ACTION_OFFSET,
     backgroundColor: '#FFD6D6',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1,
     borderRadius: 10,
+    zIndex: 1,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 6,
   },
   actionText: {
     fontSize: 22,
@@ -106,7 +129,7 @@ const styles = StyleSheet.create({
   name: {
     fontWeight: '600',
     fontSize: 16,
-    color: '#222',
+    color: '#000',
   },
   due: {
     fontSize: 12,
