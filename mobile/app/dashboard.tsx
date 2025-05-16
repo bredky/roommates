@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 import { Picker } from '@react-native-picker/picker'
 import { RefreshControl } from 'react-native'
+import SwipeableTaskCard from '../components/SwipeableTaskCard' // adjust path if needed
+import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
+
 
 import {
   View,
@@ -16,6 +19,7 @@ import {
   StyleSheet,
 } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const API_BASE = 'http://192.168.1.208:3000' // replace with your IP
 const presetTasks = [
@@ -200,6 +204,7 @@ export default function Dashboard() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#FFE600' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFE600' }}>
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         contentContainerStyle={{ padding: 20 }}
@@ -236,51 +241,32 @@ export default function Dashboard() {
 
         {/* Tasks */}
         <Text style={styles.sectionTitle}>📋 Your Tasks</Text>
-        {activeTasks.map((task) => {
-          const assignedAt = new Date(task.assignedAt)
-          const days =
-            task.cycle === 'weekly'
-              ? 7
-              : task.cycle === 'biweekly'
-              ? 14
-              : task.cycle === 'monthly'
-              ? 30
-              : task.customDays || 1
-          const deadline = new Date(assignedAt.getTime() + days * 24 * 60 * 60 * 1000)
+        {activeTasks.map((task) => (
+            <SwipeableTaskCard
+                key={task._id}
+                task={task}
+                onComplete={markTaskDone}
+                onDelete={deleteTask}
+            />
+            ))}
 
-          return (
-            <View key={task._id} style={styles.taskCard}>
-              <TouchableOpacity onPress={() => markTaskDone(task._id)}>
-                <Text style={styles.action}>✅</Text>
-              </TouchableOpacity>
-
-              <View style={{ flex: 1 }}>
-                <Text style={styles.taskName}>{task.name}</Text>
-                <Text style={styles.due}>Due in {timeUntil(deadline)}</Text>
-              </View>
-
-              <TouchableOpacity onPress={() => deleteTask(task._id)}>
-                <Text style={styles.action}>🗑️</Text>
-              </TouchableOpacity>
-            </View>
-          )
-        })}
 
         {/* Completed */}
         {completedTasks.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>✅ Completed</Text>
             {completedTasks.map((task) => (
-              <View key={task._id} style={[styles.taskCard, { opacity: 0.5 }]}>
-                <Text style={[styles.taskName, { flex: 1 }]}>{task.name}</Text>
-                <Text style={styles.due}>✔️</Text>
-              </View>
+              <SwipeableCompletedTaskCard
+              key={task._id}
+              task={task}
+              onDelete={deleteTask}
+            />
             ))}
           </>
         )}
       </ScrollView>
-
-      {/* Footer Nav */}
+    </SafeAreaView>
+    {/* Footer Nav */}
       <View style={styles.footer}>
         <Text style={styles.icon}>🔍</Text>
         <Text style={styles.icon}>📸</Text>
@@ -288,7 +274,7 @@ export default function Dashboard() {
         <Text style={styles.icon}>🏠</Text>
         <Text style={styles.icon}>⚙️</Text>
       </View>
-    </View>
+      </View>
   )
 }
 
@@ -394,7 +380,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 18,
+    alignItems: 'flex-start', // ⬅️ anchor icons to the top of the footer
+    paddingTop: 10,
+    paddingBottom: 50,
     borderTopWidth: 1,
     borderColor: '#ddd',
     backgroundColor: '#000',
