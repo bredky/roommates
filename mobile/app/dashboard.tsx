@@ -5,6 +5,9 @@ import { Picker } from '@react-native-picker/picker'
 import { RefreshControl } from 'react-native'
 import SwipeableTaskCard from '../components/SwipeableTaskCard' // adjust path if needed
 import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
+import { useRouter } from 'expo-router'
+import { generateInitialsStable } from '../../lib/utils'
+
 
 
 import {
@@ -47,7 +50,9 @@ export default function Dashboard() {
   const [showCycleSelect, setShowCycleSelect] = useState(false)
   const [customTaskInput, setCustomTaskInput] = useState('')
   const [refreshing, setRefreshing] = useState(false)
-
+  const router = useRouter()
+  const nameList = members.map((m) => m.name)
+  const initialsMap = generateInitialsStable(nameList)
 
   useEffect(() => {
     const load = async () => {
@@ -69,7 +74,6 @@ export default function Dashboard() {
 
   const fetchTasks = async () => {
     const token = await SecureStore.getItemAsync('token')
-    console.log('📤 Fetching tasks with token:', token)
   
     try {
       const res = await fetch(`${API_BASE}/api/task/mobile/get`, {
@@ -77,18 +81,15 @@ export default function Dashboard() {
       })
   
       const data = await res.json()
-      console.log('📥 Fetched task data:', data)
   
       setTasks(data.tasks || [])
     } catch (err) {
-      console.error('❌ Error fetching tasks:', err)
     }
   }
   
 
   const fetchMembers = async () => {
     const token = await SecureStore.getItemAsync('token')
-    console.log('📤 Fetching members with token:', token)
     const res = await fetch(`${API_BASE}/api/household/mobile-members`, {
         headers: { Authorization: `Bearer ${token}` },
       })      
@@ -118,9 +119,21 @@ export default function Dashboard() {
       setCustomDays('')
       setShowCycleSelect(false)
     }
+    await fetch(`${API_BASE}/api/activity/mobile-log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: 'taskCreated',
+          taskName: selectedTask,
+          timestamp: new Date().toISOString(),
+        }),
+      })
   }
 
-  const markTaskDone = async (taskId: string) => {
+  const markTaskDone = async (task: any) => {
     const token = await SecureStore.getItemAsync('token')
     await fetch(`${API_BASE}/api/task/mobile/complete`, {
       method: 'POST',
@@ -128,13 +141,34 @@ export default function Dashboard() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({ taskId: task._id }),
     })
-    await fetch(`${API_BASE}/api/task/mobile/reassign`, { method: 'POST' })
+  
+    await fetch(`${API_BASE}/api/task/mobile/reassign`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+  
+    await fetch(`${API_BASE}/api/activity/mobile-log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'taskCompleted',
+        taskName: task.name,
+        timestamp: new Date().toISOString(),
+      }),
+    })
+  
     fetchTasks()
   }
+  
 
-  const deleteTask = async (taskId: string) => {
+  const deleteTask = async (task: any) => {
     const token = await SecureStore.getItemAsync('token')
     await fetch(`${API_BASE}/api/task/mobile/delete`, {
       method: 'POST',
@@ -142,26 +176,26 @@ export default function Dashboard() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ taskId }),
+      body: JSON.stringify({ taskId: task._id }),
     })
+  
+    await fetch(`${API_BASE}/api/activity/mobile-log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'taskDeleted',
+        taskName: task.name,
+        deletedBy: user?.name,
+        timestamp: new Date().toISOString(),
+      }),
+    })
+  
     fetchTasks()
   }
-  const handleCreateHousehold = async () => {
-    const token = await SecureStore.getItemAsync('token')
-    const res = await fetch(`${API_BASE}/api/household/mobile-create`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const data = await res.json()
-    if (res.ok) {
-      setJoinCode(data.joinCode)
-      setInHousehold(true)
-      fetchMembers()
-      fetchTasks()
-    } else {
-      Alert.alert('Error', data.error || 'Could not create household')
-    }
-  }
+  
   
   const handleJoinHousehold = async () => {
     const token = await SecureStore.getItemAsync('token')
@@ -223,14 +257,9 @@ export default function Dashboard() {
                   <Text style={styles.rankNumber}>{i + 1}</Text>
                 </View>
                 <View style={styles.initials}>
-                  <Text style={styles.initialsText}>
-                    {m.name
-                      ?.split(' ')
-                      .map((n: string) => n[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase()}
-                  </Text>
+                <Text style={styles.initialsText}>
+                    {initialsMap[m.name] || m.name.slice(0, 2).toUpperCase()}
+                </Text>
                 </View>
                 <Text style={styles.memberName}>{m.name === user?.name ? `${m.name} (You)` : m.name}</Text>
                 <Text style={styles.points}>{m.points || 0} pts</Text>
@@ -245,8 +274,8 @@ export default function Dashboard() {
             <SwipeableTaskCard
                 key={task._id}
                 task={task}
-                onComplete={markTaskDone}
-                onDelete={deleteTask}
+                onComplete={(id) => markTaskDone(task)}
+                onDelete={(id) => deleteTask(task)}
             />
             ))}
 
@@ -259,7 +288,7 @@ export default function Dashboard() {
               <SwipeableCompletedTaskCard
               key={task._id}
               task={task}
-              onDelete={deleteTask}
+              onDelete={(id) => deleteTask(task)}
             />
             ))}
           </>
@@ -271,7 +300,7 @@ export default function Dashboard() {
         <Text style={styles.icon}>🔍</Text>
         <Text style={styles.icon}>📸</Text>
         <Text style={[styles.icon, styles.activeIcon]}>🟡</Text>
-        <Text style={styles.icon}>🏠</Text>
+        <Text style={styles.icon} onPress={() => router.push('/household')}>🏠</Text>
         <Text style={styles.icon}>⚙️</Text>
       </View>
       </View>

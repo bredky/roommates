@@ -6,12 +6,12 @@ export async function POST() {
   const db = await connectDB()
   const tasks = db.collection('tasks')
   const users = db.collection('users')
+  const activity = db.collection('activity')
 
   const allTasks = await tasks.find({}).toArray()
   const now = new Date()
   const msPerDay = 1000 * 60 * 60 * 24
 
-  // ✅ More precise, supports decimal durations
   const getDeadline = (task: any) => {
     const assignedAt = new Date(task.assignedAt)
     const days =
@@ -23,12 +23,11 @@ export async function POST() {
     return new Date(assignedAt.getTime() + days * msPerDay)
   }
 
-  // ✅ Calculate overdue days
   const getOverdueDays = (task: any) => {
     if (task.completed) return 0
     const deadline = getDeadline(task)
     const msLate = now.getTime() - deadline.getTime()
-    return msLate > 0 ? Math.floor(msLate / msPerDay) + 1 : 0 // Always at least 1 if overdue
+    return msLate > 0 ? Math.floor(msLate / msPerDay) + 1 : 0
   }
 
   const sortedTasks = [...allTasks].sort((a, b) =>
@@ -61,6 +60,7 @@ export async function POST() {
       const sorted = [...workloadMap.entries()].sort((a, b) => a[1] - b[1])
       if (sorted.length === 0) continue
       const newAssigneeId = sorted[0][0]
+      const newUser = await users.findOne({ _id: new ObjectId(newAssigneeId) })
 
       await tasks.updateOne(
         { _id: task._id },
@@ -82,6 +82,17 @@ export async function POST() {
         }
       )
 
+      await activity.insertOne({
+        type: 'taskReassigned',
+        taskName: task.name,
+        user: {
+          name: newUser?.name || 'Unknown',
+          email: newUser?.email || 'Unknown',
+        },
+        timestamp: now,
+        householdId: task.householdId,
+      })
+
       reassignmentMade = true
       results.push({
         task: task.name,
@@ -102,6 +113,18 @@ export async function POST() {
         { $inc: { points: overdueDays } }
       )
 
+      await activity.insertOne({
+        type: 'pointGiven',
+        taskName: task.name,
+        user: {
+          name: user.name,
+          email: user.email,
+        },
+        points: overdueDays,
+        timestamp: now,
+        householdId: task.householdId,
+      })
+
       console.log(`➕ Added ${overdueDays} point(s) to user ${assignedUserId} for overdue task "${task.name}"`)
 
       // ✅ Case 3: If user now has 3+ points → reassign (include previous)
@@ -121,6 +144,7 @@ export async function POST() {
         const sorted = [...workloadMap.entries()].sort((a, b) => a[1] - b[1])
         if (sorted.length === 0) continue
         const newAssigneeId = sorted[0][0]
+        const newUser = await users.findOne({ _id: new ObjectId(newAssigneeId) })
 
         await tasks.updateOne(
           { _id: task._id },
@@ -141,6 +165,17 @@ export async function POST() {
             }
           }
         )
+
+        await activity.insertOne({
+          type: 'taskReassigned',
+          taskName: task.name,
+          user: {
+            name: newUser?.name || 'Unknown',
+            email: newUser?.email || 'Unknown',
+          },
+          timestamp: now,
+          householdId: task.householdId,
+        })
 
         reassignmentMade = true
         results.push({
