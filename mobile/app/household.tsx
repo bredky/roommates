@@ -1,10 +1,14 @@
 // /mobile/app/household.tsx
 
 import React, { useEffect, useState } from 'react'
-import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store'
 import { useRouter } from 'expo-router'
+import AddTaskModal from '../components/AddTaskModal'
+import { findNodeHandle } from 'react-native'
+
+
 
 import SwipeableTaskCard from '../components/SwipeableTaskCard'
 import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
@@ -19,6 +23,7 @@ export default function Household() {
   const [tasks, setTasks] = useState<any[]>([])
   const [activityLog, setActivityLog] = useState<any[]>([])
   const [refreshing, setRefreshing] = useState(false)
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false)
 
   const router = useRouter()
 
@@ -63,7 +68,40 @@ export default function Household() {
     
       fetchTasks()
     }
-
+    
+    const handleAddTask = async ({ name, cycle, customDays }: any) => {
+        const token = await SecureStore.getItemAsync('token')
+      
+        await fetch(`${API_BASE}/api/task/mobile/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name,
+            cycle,
+            customDays: cycle === 'custom' ? customDays : null,
+          }),
+        })
+      
+        await fetch(`${API_BASE}/api/activity/mobile-log`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            type: 'taskCreated',
+            taskName: name,
+            timestamp: new Date().toISOString(),
+          }),
+        })
+      
+        fetchTasks()
+        fetchActivity()
+      }
+      
   const fetchMembers = async () => {
     const token = await SecureStore.getItemAsync('token')
     const res = await fetch(`${API_BASE}/api/household/mobile-members`, {
@@ -150,24 +188,48 @@ export default function Household() {
           <Text style={styles.sticker}>🏷️ Code: {user?.joinCode}</Text>
 
           {/* Leaderboard */}
-          <Text style={styles.sectionTitle}>🏆 Leaderboard</Text>
-          {members.map((m, i) => (
-            <View key={i} style={[styles.rankCard, i === 0 && styles.rankCardTop]}>
-              <View style={styles.rankCircle}>
-                <Text style={styles.rankNumber}>{i + 1}</Text>
-              </View>
-              <View style={styles.initials}>
-                <Text style={styles.initialsText}>
-                  {m.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
-                </Text>
-              </View>
-              <Text style={styles.memberName}>
-                {m.name === user?.name ? `${m.name} (You)` : m.name}
-              </Text>
-              <Text style={styles.points}>{m.points || 0} pts</Text>
-            </View>
-          ))}
+        <View style={styles.leaderboardRow}>
+  {/* Leaderboard Section */}
+  <View style={{ flex: 1 }}>
+    <Text style={styles.sectionTitle}>🏆 Leaderboard</Text>
+    {members.map((m, i) => (
+      <View key={i} style={[styles.rankCard, i === 0 && styles.rankCardTop]}>
+        <View style={styles.rankCircle}>
+          <Text style={styles.rankNumber}>{i + 1}</Text>
+        </View>
+        <View style={styles.initials}>
+          <Text style={styles.initialsText}>
+            {m.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+          </Text>
+        </View>
+        <Text style={styles.memberName}>
+          {m.name === user?.name ? `${m.name} (You)` : m.name}
+        </Text>
+        <Text style={styles.points}>{m.points || 0} pts</Text>
+      </View>
+    ))}
+  </View>
 
+  {/* Buttons Section */}
+  <View style={styles.buttonStack}>
+    <TouchableOpacity
+      onPress={() => setShowAddTaskModal(true)}
+      style={styles.actionButton}
+    >
+      <Text style={styles.buttonText}>➕ Add Task</Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      onPress={() => alert('🚨 Report feature coming soon!')}
+      style={styles.actionButton}
+    >
+      <Text style={styles.buttonText}>🚨 Report</Text>
+    </TouchableOpacity>
+  </View>
+</View>
+
+
+          
           {/* Activity Feed */}
           <Text style={styles.sectionTitle}>📜 Household Activity</Text>
           <View style={styles.activityBlock}>
@@ -204,6 +266,12 @@ export default function Household() {
         <Text style={[styles.icon, styles.activeIcon]}>🏠</Text>
         <Text style={styles.icon}>⚙️</Text>
       </View>
+      <AddTaskModal
+        visible={showAddTaskModal}
+        onClose={() => setShowAddTaskModal(false)}
+        onSubmit={handleAddTask}
+        />
+
     </View>
   )
 }
@@ -300,4 +368,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 20,
   },
+  leaderboardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center', // ⬅️ centers buttons vertically
+    marginBottom: 20,
+  },
+  buttonStack: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    gap: 12,
+  },
+  actionButton: {
+    backgroundColor: '#000',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: '#FFE600',
+    fontWeight: '600',
+  },
+  
 })

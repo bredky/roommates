@@ -6,8 +6,7 @@ import { RefreshControl } from 'react-native'
 import SwipeableTaskCard from '../components/SwipeableTaskCard' // adjust path if needed
 import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
 import { useRouter } from 'expo-router'
-import { generateInitialsStable } from '../../lib/utils'
-
+import { generateInitialsStable } from '../lib/utils'
 
 
 import {

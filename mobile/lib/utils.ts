@@ -1,10 +1,3 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
 export function generateInitialsStable(names: string[]) {
   const initialsMap: { [name: string]: string } = {}
   const used: Set<string> = new Set()
