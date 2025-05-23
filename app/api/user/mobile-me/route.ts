@@ -30,6 +30,7 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
+      _id: user._id.toString(),
       name: user.name,
       email: user.email,
       householdId: user.householdId || null,

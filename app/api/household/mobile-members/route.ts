@@ -19,6 +19,7 @@ export async function GET(req: Request) {
 
     const members = await users.find({ householdId: user.householdId }).toArray()
     const formatted = members.map((m) => ({
+      _id: m._id.toString(),
       name: m.name,
       email: m.email,
       points: m.points || 0,

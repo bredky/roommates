@@ -1,14 +1,9 @@
-// /mobile/app/household.tsx
-
 import React, { useEffect, useState } from 'react'
 import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store'
 import { useRouter } from 'expo-router'
 import AddTaskModal from '../components/AddTaskModal'
-import { findNodeHandle } from 'react-native'
-
-
 
 import SwipeableTaskCard from '../components/SwipeableTaskCard'
 import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
@@ -22,6 +17,7 @@ export default function Household() {
   const [members, setMembers] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [activityLog, setActivityLog] = useState<any[]>([])
+  const [openVotes, setOpenVotes] = useState<any[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [showAddTaskModal, setShowAddTaskModal] = useState(false)
 
@@ -35,73 +31,7 @@ export default function Household() {
     const data = await res.json()
     setUser(data)
   }
-    const markTaskDone = async (task: any) => {
-      const token = await SecureStore.getItemAsync('token')
-      await fetch(`${API_BASE}/api/task/mobile/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ taskId: task._id }),
-      })
-    
-      await fetch(`${API_BASE}/api/task/mobile/reassign`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
 
-      await fetch(`${API_BASE}/api/activity/mobile-log`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          type: 'taskCompleted',
-          taskName: task.name,
-          timestamp: new Date().toISOString(),
-        }),
-      })
-    
-      fetchTasks()
-    }
-    
-    const handleAddTask = async ({ name, cycle, customDays }: any) => {
-        const token = await SecureStore.getItemAsync('token')
-      
-        await fetch(`${API_BASE}/api/task/mobile/create`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            name,
-            cycle,
-            customDays: cycle === 'custom' ? customDays : null,
-          }),
-        })
-      
-        await fetch(`${API_BASE}/api/activity/mobile-log`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            type: 'taskCreated',
-            taskName: name,
-            timestamp: new Date().toISOString(),
-          }),
-        })
-      
-        fetchTasks()
-        fetchActivity()
-      }
-      
   const fetchMembers = async () => {
     const token = await SecureStore.getItemAsync('token')
     const res = await fetch(`${API_BASE}/api/household/mobile-members`, {
@@ -120,37 +50,6 @@ export default function Household() {
     setTasks(data.tasks || [])
   }
 
-    const deleteTask = async (task: any) => {
-      const token = await SecureStore.getItemAsync('token')
-      await fetch(`${API_BASE}/api/task/mobile/delete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ taskId: task._id }),
-      })
-      
-       const res = await fetch(`${API_BASE}/api/activity/mobile-log`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          type: 'taskDeleted',
-          taskName: task.name,
-          deletedBy: user?.name,
-          timestamp: new Date().toISOString(),
-        }),
-      })
-      console.log('🧾 Activity log status:', res.status)
-      const result = await res.json()
-      console.log('📦 Activity response body:', result)
-    
-      fetchTasks()
-    }
-    
   const fetchActivity = async () => {
     const token = await SecureStore.getItemAsync('token')
     const res = await fetch(`${API_BASE}/api/activity/mobile-feed`, {
@@ -160,18 +59,123 @@ export default function Household() {
     setActivityLog(data.activityLog || [])
   }
 
+  const fetchVotes = async () => {
+    const token = await SecureStore.getItemAsync('token')
+    const res = await fetch(`${API_BASE}/api/vote/mobile-get`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json()
+    setOpenVotes(data.votes || [])
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchUserData()
     await fetchMembers()
     await fetchTasks()
     await fetchActivity()
+    await fetchVotes()
     setRefreshing(false)
   }
 
   useEffect(() => {
     handleRefresh()
   }, [])
+
+  const markTaskDone = async (task: any) => {
+    const token = await SecureStore.getItemAsync('token')
+    await fetch(`${API_BASE}/api/task/mobile/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ taskId: task._id }),
+    })
+
+    await fetch(`${API_BASE}/api/task/mobile/reassign`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    await fetch(`${API_BASE}/api/activity/mobile-log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'taskCompleted',
+        taskName: task.name,
+        timestamp: new Date().toISOString(),
+      }),
+    })
+
+    fetchTasks()
+  }
+
+  const deleteTask = async (task: any) => {
+    const token = await SecureStore.getItemAsync('token')
+    await fetch(`${API_BASE}/api/task/mobile/delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ taskId: task._id }),
+    })
+
+    await fetch(`${API_BASE}/api/activity/mobile-log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'taskDeleted',
+        taskName: task.name,
+        deletedBy: user?.name,
+        timestamp: new Date().toISOString(),
+      }),
+    })
+
+    fetchTasks()
+  }
+
+  const handleAddTask = async ({ name, cycle, customDays }: any) => {
+    const token = await SecureStore.getItemAsync('token')
+
+    await fetch(`${API_BASE}/api/task/mobile/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name,
+        cycle,
+        customDays: cycle === 'custom' ? customDays : null,
+      }),
+    })
+
+    await fetch(`${API_BASE}/api/activity/mobile-log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'taskCreated',
+        taskName: name,
+        timestamp: new Date().toISOString(),
+      }),
+    })
+
+    fetchTasks()
+    fetchActivity()
+  }
 
   const userTasks = tasks.filter((t) => !t.completed && t.assignedTo?.email === user?.email)
   const othersTasks = tasks.filter((t) => !t.completed && t.assignedTo?.email !== user?.email)
@@ -184,52 +188,62 @@ export default function Household() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           contentContainerStyle={{ padding: 20 }}
         >
-          {/* Top Sticker */}
           <Text style={styles.sticker}>🏷️ Code: {user?.joinCode}</Text>
 
           {/* Leaderboard */}
-        <View style={styles.leaderboardRow}>
-  {/* Leaderboard Section */}
-  <View style={{ flex: 1 }}>
-    <Text style={styles.sectionTitle}>🏆 Leaderboard</Text>
-    {members.map((m, i) => (
-      <View key={i} style={[styles.rankCard, i === 0 && styles.rankCardTop]}>
-        <View style={styles.rankCircle}>
-          <Text style={styles.rankNumber}>{i + 1}</Text>
-        </View>
-        <View style={styles.initials}>
-          <Text style={styles.initialsText}>
-            {m.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
-          </Text>
-        </View>
-        <Text style={styles.memberName}>
-          {m.name === user?.name ? `${m.name} (You)` : m.name}
-        </Text>
-        <Text style={styles.points}>{m.points || 0} pts</Text>
-      </View>
-    ))}
-  </View>
+          <View style={styles.leaderboardRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionTitle}>🏆 Leaderboard</Text>
+              {members.map((m, i) => (
+                <View key={i} style={[styles.rankCard, i === 0 && styles.rankCardTop]}>
+                  <View style={styles.rankCircle}>
+                    <Text style={styles.rankNumber}>{i + 1}</Text>
+                  </View>
+                  <View style={styles.initials}>
+                    <Text style={styles.initialsText}>
+                      {m.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.memberName}>
+                    {m.name === user?.name ? `${m.name} (You)` : m.name}
+                  </Text>
+                  <Text style={styles.points}>{m.points || 0} pts</Text>
+                </View>
+              ))}
+            </View>
 
-  {/* Buttons Section */}
-  <View style={styles.buttonStack}>
-    <TouchableOpacity
-      onPress={() => setShowAddTaskModal(true)}
-      style={styles.actionButton}
-    >
-      <Text style={styles.buttonText}>➕ Add Task</Text>
-    </TouchableOpacity>
+            {/* Action Buttons */}
+            <View style={styles.buttonStack}>
+              <TouchableOpacity onPress={() => setShowAddTaskModal(true)} style={styles.actionButton}>
+                <Text style={styles.buttonText}>➕ Add Task</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => alert('🚨 Report feature coming soon!')} style={styles.actionButton}>
+                <Text style={styles.buttonText}>🚨 Report</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
-    <TouchableOpacity
-      onPress={() => alert('🚨 Report feature coming soon!')}
-      style={styles.actionButton}
-    >
-      <Text style={styles.buttonText}>🚨 Report</Text>
-    </TouchableOpacity>
-  </View>
-</View>
+          {/* OPEN VOTE BLOCK */}
+          {openVotes.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>🗳️ Open Vote</Text>
+              {openVotes.map((vote, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.voteBlock}
+                  onPress={() => {
+                      router.push({ pathname: '/vote/respond', params: { voteId: vote._id.toString() } })
+                    
+                  }}
+                >
+                  <Text style={styles.voteLabel}>Report from {members.find(m => m._id === vote.reporterId)?.name}</Text>
+                  <Text style={styles.voteTarget}>Blaming: {members.find(m => m._id === vote.reportedUserId)?.name}</Text>
+                  <Text style={styles.voteDescription}>{vote.description}</Text>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
 
-
-          
           {/* Activity Feed */}
           <Text style={styles.sectionTitle}>📜 Household Activity</Text>
           <View style={styles.activityBlock}>
@@ -246,8 +260,7 @@ export default function Household() {
             <SwipeableTaskCard key={task._id} task={task} onComplete={() => markTaskDone(task)} onDelete={() => deleteTask(task)} />
           ))}
           {othersTasks.map((task) => (
-            <NonOwnedTaskCard key={task._id} task={task} onDelete={() => deleteTask(task)}
-            />
+            <NonOwnedTaskCard key={task._id} task={task} onDelete={() => deleteTask(task)} />
           ))}
 
           {/* Completed */}
@@ -258,7 +271,6 @@ export default function Household() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Footer Nav */}
       <View style={styles.footer}>
         <Text style={styles.icon}>🔍</Text>
         <Text style={styles.icon} onPress={() => router.push('/report/camera')}>📸</Text>
@@ -266,12 +278,12 @@ export default function Household() {
         <Text style={[styles.icon, styles.activeIcon]}>🏠</Text>
         <Text style={styles.icon}>⚙️</Text>
       </View>
+
       <AddTaskModal
         visible={showAddTaskModal}
         onClose={() => setShowAddTaskModal(false)}
         onSubmit={handleAddTask}
-        />
-
+      />
     </View>
   )
 }
@@ -388,6 +400,26 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#FFE600',
     fontWeight: '600',
+  },
+  voteBlock: {
+    backgroundColor: '#000',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  voteLabel: {
+    color: '#FFE600',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  voteTarget: {
+    color: '#fff',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  voteDescription: {
+    color: '#ccc',
+    fontStyle: 'italic',
   },
   
 })
