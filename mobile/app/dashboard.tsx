@@ -7,6 +7,7 @@ import SwipeableTaskCard from '../components/SwipeableTaskCard' // adjust path i
 import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
 import { useRouter } from 'expo-router'
 import { generateInitialsStable } from '../lib/utils'
+import { useAppStore } from '../lib/UseAppStore' 
 
 
 import {
@@ -24,17 +25,7 @@ import * as SecureStore from 'expo-secure-store'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 const API_BASE = 'http://192.168.1.208:3000' // replace with your IP
-const presetTasks = [
-  'Do the dishes',
-  'Clean kitchen surfaces',
-  'Take out the trash',
-  'Vacuum living room',
-  'Wipe down stove',
-  'Mop floors',
-  'Refill supplies',
-  'Clean fridge',
-  'Water plants',
-]
+
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
@@ -52,7 +43,7 @@ export default function Dashboard() {
   const router = useRouter()
   const nameList = members.map((m) => m.name)
   const initialsMap = generateInitialsStable(nameList)
-
+  
   useEffect(() => {
     const load = async () => {
       const token = await SecureStore.getItemAsync('token')
@@ -297,7 +288,7 @@ export default function Dashboard() {
     {/* Footer Nav */}
       <View style={styles.footer}>
         <Text style={styles.icon}>🔍</Text>
-        <Text style={styles.icon}>📸</Text>
+        <Text style={styles.icon} onPress={() => router.push('/report/camera')}>📸</Text>
         <Text style={[styles.icon, styles.activeIcon]}>🟡</Text>
         <Text style={styles.icon} onPress={() => router.push('/household')}>🏠</Text>
         <Text style={styles.icon}>⚙️</Text>

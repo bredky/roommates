@@ -7,13 +7,13 @@ const API_BASE = 'http://192.168.1.208:3000'
 
 export default function Index() {
   const [destination, setDestination] = useState<string | null>(null)
-  useEffect(() => {
-    const clearToken = async () => {
-      await SecureStore.deleteItemAsync('token')
-      console.log('🔓 Token cleared')
-    }
-    clearToken()
-  }, [])
+  // useEffect(() => {
+  //   const clearToken = async () => {
+  //     await SecureStore.deleteItemAsync('token')
+  //     console.log('🔓 Token cleared')
+  //   }
+  //   clearToken()
+  // }, [])
   
   useEffect(() => {
     const checkAuth = async () => {
