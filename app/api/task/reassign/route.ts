@@ -108,10 +108,8 @@ export async function POST() {
       const user = await users.findOne({ _id: new ObjectId(assignedUserId) })
       if (!user) continue
 
-      await users.updateOne(
-        { _id: user._id },
-        { $inc: { points: overdueDays } }
-      )
+      await users.updateOne({ _id: user._id }, { $inc: { points: overdueDays } })
+      await tasks.updateOne({ _id: task._id }, { $inc: { overduePoints: overdueDays } })
 
       await activity.insertOne({
         type: 'pointGiven',

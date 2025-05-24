@@ -99,13 +99,12 @@ export async function POST(req: Request) {
       const user = await users.findOne({ _id: new ObjectId(assignedUserId) })
       if (!user) continue
 
-      await users.updateOne(
-        { _id: user._id },
-        { $inc: { points: overdueDays } }
-      )
+      await users.updateOne({ _id: user._id }, { $inc: { points: overdueDays } })
+      await tasks.updateOne({ _id: task._id }, { $inc: { overduePoints: overdueDays } })
 
-      const updatedUser = await users.findOne({ _id: user._id })
-      if (updatedUser && updatedUser.points >= 3) {
+
+      const updatedTask = await tasks.findOne({ _id: task._id })
+      if (updatedTask && updatedTask.points >= 3) {
         const householdUsers = await users.find({ householdId: task.householdId }).toArray()
         const workloadMap = new Map<string, number>()
 
@@ -140,6 +139,7 @@ export async function POST(req: Request) {
             }
           }
         )
+        await tasks.updateOne({ _id: task._id }, { $set: { overduePoints: 0 } })
 
         reassignmentMade = true
         results.push({

@@ -276,7 +276,7 @@ export default function Household() {
         <Text style={styles.icon} onPress={() => router.push('/report/camera')}>📸</Text>
         <Text style={styles.icon} onPress={() => router.push('/dashboard')}>🟡</Text>
         <Text style={[styles.icon, styles.activeIcon]}>🏠</Text>
-        <Text style={styles.icon}>⚙️</Text>
+        <Text style={styles.icon} onPress={() => router.push('/logout')}>⚙️</Text>
       </View>
 
       <AddTaskModal

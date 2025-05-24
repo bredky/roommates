@@ -4,7 +4,6 @@ import { verify } from 'jsonwebtoken'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
-  console.log('✅ /api/task/mobile/get route HIT')
 
   const authHeader = req.headers.get('authorization')
   if (!authHeader) {
@@ -21,7 +20,6 @@ export async function GET(req: Request) {
   let decoded: any
   try {
     decoded = verify(token, process.env.NEXTAUTH_SECRET!)
-    console.log('🔓 Token decoded:', decoded)
   } catch (err) {
     console.error('❌ Token verification failed:', err)
     return NextResponse.json({ error: 'Invalid token' }, { status: 403 })
@@ -33,15 +31,13 @@ export async function GET(req: Request) {
   const members = db.collection('users') // redundant, but fine
 
   const user = await users.findOne({ _id: new ObjectId(decoded.userId) })
-  console.log('👤 User found:', user)
 
   if (!user?.householdId) {
-    console.log('⚠️ User has no household')
     return NextResponse.json({ tasks: [] })
   }
 
   const taskList = await tasks.find({ householdId: user.householdId }).toArray()
-  console.log('📄 Raw tasks:', taskList)
+  
 
   const populatedTasks = await Promise.all(
     taskList.map(async (task) => {
@@ -55,8 +51,6 @@ export async function GET(req: Request) {
       return task
     })
   )
-
-  console.log('✅ Populated tasks:', populatedTasks)
 
   return NextResponse.json({ tasks: populatedTasks })
 }

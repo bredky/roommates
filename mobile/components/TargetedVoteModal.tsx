@@ -43,28 +43,71 @@ export default function TargetedVoteModal({
   const [description, setDescription] = useState('')
 
   const delayOptions = [0, 8, 16, 24]
-
-  const handleSubmit = async () => {
+  
+  const uploadImage = async (uri: string) => {
     const token = await SecureStore.getItemAsync('token')
-    const delayHours = delay === -1 ? parseInt(customDelay) || 0 : delay
+    console.log('🗝️ Token:', token)
+    const formData = new FormData()
+    formData.append('file', {
+      uri,
+      name: 'photo.jpg',
+      type: 'image/jpeg',
+    } as any)
+    console.log('Uploading image to:', `${API_BASE}/api/upload-image`)
 
-    await fetch(`${API_BASE}/api/vote/targeted-create`, {
+    const res = await fetch(`${API_BASE}/api/upload-image`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token}`, // do NOT set Content-Type manually!
       },
-      body: JSON.stringify({
-        imageUri,
-        reportedUserId: selectedUser._id,
-        delayHours,
-        description,
-      }),
+      body: formData,
     })
-
-    onClose()
-    router.push('/household')
+  
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Upload failed')
+    return data.url
   }
+  
+  const handleSubmit = async () => {
+    try {
+      if (!selectedUser) {
+        alert('Please select a user who caused the mess.')
+        return
+      }
+  
+      if (!description.trim()) {
+        alert('Please enter a description.')
+        return
+      }
+  
+      // 1. Upload image and get public URL
+      const publicImageUrl = await uploadImage(imageUri)
+  
+      // 2. Submit targeted vote with public image URL
+      const token = await SecureStore.getItemAsync('token')
+      const delayHours = delay === -1 ? parseInt(customDelay) || 0 : delay
+  
+      await fetch(`${API_BASE}/api/vote/targeted-create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          imageUri: publicImageUrl,
+          reportedUserId: selectedUser._id,
+          delayHours,
+          description,
+        }),
+      })
+  
+      onClose()
+      router.push('/household')
+    } catch (error: any) {
+      alert(error.message || 'Something went wrong during upload.')
+    }
+  }
+  
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
