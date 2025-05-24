@@ -7,11 +7,12 @@ export async function POST(req: Request) {
   const token = req.headers.get('authorization')?.split(' ')[1]
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  verify(token, process.env.NEXTAUTH_SECRET!) // just to validate
+  verify(token, process.env.NEXTAUTH_SECRET!)
 
   const db = await connectDB()
   const tasks = db.collection('tasks')
   const users = db.collection('users')
+  const activity = db.collection('activity')
 
   const allTasks = await tasks.find({}).toArray()
   const now = new Date()
@@ -28,11 +29,11 @@ export async function POST(req: Request) {
     return new Date(assignedAt.getTime() + days * msPerDay)
   }
 
-  const getOverdueDays = (task: any) => {
-    if (task.completed) return 0
+  const getOverduePointCount = (task: any) => {
     const deadline = getDeadline(task)
     const msLate = now.getTime() - deadline.getTime()
-    return msLate > 0 ? Math.floor(msLate / msPerDay) + 1 : 0
+    if (msLate < 0) return 0
+    return 1 + Math.floor(msLate / msPerDay) // immediate + one per 24h
   }
 
   const sortedTasks = [...allTasks].sort((a, b) =>
@@ -46,8 +47,34 @@ export async function POST(req: Request) {
     const deadline = getDeadline(task)
     const assignedUserId = task.assignedTo?.toString()
     const isCompleted = task.completed
-    const overdueDays = getOverdueDays(task)
 
+    // ✅ Delete overdue report-based task
+    if (task.fromReport && !isCompleted && now > deadline) {
+      if (assignedUserId) {
+        await users.updateOne(
+          { _id: new ObjectId(assignedUserId) },
+          { $inc: { points: 1 } }
+        )
+
+        const user = await users.findOne({ _id: new ObjectId(assignedUserId) })
+        await activity.insertOne({
+          type: 'reportTaskMissed',
+          taskName: task.name,
+          points: 1,
+          timestamp: now,
+          user: {
+            name: user?.name || 'Unknown',
+            email: user?.email || 'Unknown',
+          },
+          householdId: task.householdId,
+        })
+      }
+
+      await tasks.deleteOne({ _id: task._id })
+      continue
+    }
+
+    // ✅ CASE 1: Completed + deadline passed → reassign
     if (isCompleted && now > deadline) {
       const householdUsers = await users.find({ householdId: task.householdId }).toArray()
       const workloadMap = new Map<string, number>()
@@ -56,7 +83,8 @@ export async function POST(req: Request) {
         if (u._id.toString() === assignedUserId) continue
         const userTasks = await tasks.find({
           assignedTo: u._id,
-          completed: false
+          completed: false,
+          fromReport: { $ne: true },
         }).toArray()
         workloadMap.set(u._id.toString(), userTasks.length)
       }
@@ -64,6 +92,7 @@ export async function POST(req: Request) {
       const sorted = [...workloadMap.entries()].sort((a, b) => a[1] - b[1])
       if (sorted.length === 0) continue
       const newAssigneeId = sorted[0][0]
+      const newUser = await users.findOne({ _id: new ObjectId(newAssigneeId) })
 
       await tasks.updateOne(
         { _id: task._id },
@@ -72,46 +101,76 @@ export async function POST(req: Request) {
             assignedTo: new ObjectId(newAssigneeId),
             assignedAt: now,
             completed: false,
-            completedAt: null
+            completedAt: null,
+            overduePoints: 0,
           },
           $push: {
             history: {
               user: new ObjectId(assignedUserId),
               assignedAt: task.assignedAt,
               completedAt: task.completedAt,
-              deadline
-            }
-          }
+              deadline,
+            },
+          },
         }
       )
+
+      await activity.insertOne({
+        type: 'taskReassigned',
+        taskName: task.name,
+        user: {
+          name: newUser?.name || 'Unknown',
+          email: newUser?.email || 'Unknown',
+        },
+        timestamp: now,
+        householdId: task.householdId,
+      })
 
       reassignmentMade = true
       results.push({
         task: task.name,
         reason: 'completed + deadline passed',
         from: assignedUserId,
-        to: newAssigneeId
+        to: newAssigneeId,
       })
       break
     }
 
-    if (overdueDays > 0 && !isCompleted && assignedUserId) {
+    // ✅ CASE 2: Overdue and incomplete → add points
+    if (!isCompleted && now > deadline && assignedUserId) {
       const user = await users.findOne({ _id: new ObjectId(assignedUserId) })
       if (!user) continue
 
-      await users.updateOne({ _id: user._id }, { $inc: { points: overdueDays } })
-      await tasks.updateOne({ _id: task._id }, { $inc: { overduePoints: overdueDays } })
+      const overduePointsGiven = task.overduePoints || 0
+      const totalShouldHave = getOverduePointCount(task)
+      const newPointsToGive = totalShouldHave - overduePointsGiven
 
+      if (newPointsToGive > 0) {
+        await users.updateOne({ _id: user._id }, { $inc: { points: newPointsToGive } })
+        await tasks.updateOne({ _id: task._id }, { $inc: { overduePoints: newPointsToGive } })
 
-      const updatedTask = await tasks.findOne({ _id: task._id })
-      if (updatedTask && updatedTask.points >= 3) {
+        await activity.insertOne({
+          type: 'pointGiven',
+          taskName: task.name,
+          user: {
+            name: user.name,
+            email: user.email,
+          },
+          points: newPointsToGive,
+          timestamp: now,
+          householdId: task.householdId,
+        })
+      }
+
+      if ((overduePointsGiven + newPointsToGive) >= 3) {
         const householdUsers = await users.find({ householdId: task.householdId }).toArray()
         const workloadMap = new Map<string, number>()
 
         for (const u of householdUsers) {
           const userTasks = await tasks.find({
             assignedTo: u._id,
-            completed: false
+            completed: false,
+            fromReport: { $ne: true },
           }).toArray()
           workloadMap.set(u._id.toString(), userTasks.length)
         }
@@ -119,6 +178,7 @@ export async function POST(req: Request) {
         const sorted = [...workloadMap.entries()].sort((a, b) => a[1] - b[1])
         if (sorted.length === 0) continue
         const newAssigneeId = sorted[0][0]
+        const newUser = await users.findOne({ _id: new ObjectId(newAssigneeId) })
 
         await tasks.updateOne(
           { _id: task._id },
@@ -127,26 +187,37 @@ export async function POST(req: Request) {
               assignedTo: new ObjectId(newAssigneeId),
               assignedAt: now,
               completed: false,
-              completedAt: null
+              completedAt: null,
+              overduePoints: 0,
             },
             $push: {
               history: {
                 user: new ObjectId(assignedUserId),
                 assignedAt: task.assignedAt,
                 completedAt: null,
-                deadline
-              }
-            }
+                deadline,
+              },
+            },
           }
         )
-        await tasks.updateOne({ _id: task._id }, { $set: { overduePoints: 0 } })
+
+        await activity.insertOne({
+          type: 'taskReassigned',
+          taskName: task.name,
+          user: {
+            name: newUser?.name || 'Unknown',
+            email: newUser?.email || 'Unknown',
+          },
+          timestamp: now,
+          householdId: task.householdId,
+        })
 
         reassignmentMade = true
         results.push({
           task: task.name,
-          reason: 'user reached 3+ points',
+          reason: 'task reached 3+ overdue points',
           from: assignedUserId,
-          to: newAssigneeId
+          to: newAssigneeId,
         })
         break
       }
@@ -155,6 +226,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     message: reassignmentMade ? 'Reassignment occurred' : 'No tasks reassigned',
-    summary: results
+    summary: results,
   })
 }

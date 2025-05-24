@@ -1,4 +1,3 @@
-// /app/api/vote/mobile-cast/route.ts
 import { connectDB } from '@/lib/mongodb'
 import { ObjectId } from 'mongodb'
 import { verify } from 'jsonwebtoken'
@@ -39,21 +38,29 @@ export async function POST(req: Request) {
   const updatedVotes = [...(vote.votes || []), { userId: user._id, vote: decision }]
   const updatedVoters = [...(vote.voters || []), user._id.toString()]
 
-  // Fetch all household members to calculate majority
   const memberList = await users.find({ householdId: vote.householdId }).toArray()
-  const numVotersRequired = memberList.length - 1 // excluding reporter
+  const totalVoters = memberList.length // Includes reporter
+  const majority = Math.floor(totalVoters / 2) + 1
 
-  // Check if vote should be resolved
-  let shouldResolve = updatedVoters.length >= numVotersRequired
+  const yesVotes = updatedVotes.filter((v: any) => v.vote === 'yes').length
+  const noVotes = updatedVotes.filter((v: any) => v.vote === 'no').length
+  const totalVotes = updatedVoters.length
+
+  let shouldResolve = false
   let majorityDecision = null
 
-  if (shouldResolve) {
-    const yesVotes = updatedVotes.filter((v: any) => v.vote === 'yes').length
-    const noVotes = updatedVotes.filter((v: any) => v.vote === 'no').length
-    majorityDecision = yesVotes >= noVotes ? 'yes' : 'no'
+  if (yesVotes >= majority) {
+    shouldResolve = true
+    majorityDecision = 'yes'
+  } else if (noVotes >= majority) {
+    shouldResolve = true
+    majorityDecision = 'no'
+  } else if (totalVotes === totalVoters) {
+    shouldResolve = true
+    majorityDecision = 'yes' // Default to yes on tie
   }
 
-  // Update the vote doc
+  // Update the vote document
   await votes.updateOne(
     { _id: vote._id },
     {
@@ -65,7 +72,7 @@ export async function POST(req: Request) {
     }
   )
 
-  // Handle result
+  // Handle result if resolved
   if (shouldResolve && majorityDecision === 'yes') {
     // 1. Assign point to reported user
     await users.updateOne(
@@ -73,7 +80,7 @@ export async function POST(req: Request) {
       { $inc: { points: 1 } }
     )
 
-    // 2. Create task
+    // 2. Create follow-up task
     const deadline = new Date()
     deadline.setHours(deadline.getHours() + vote.delayHours)
 
@@ -85,10 +92,12 @@ export async function POST(req: Request) {
       completed: false,
       cycle: 'single',
       completedAt: null,
+      history: [],
+      overduePoints: 0, 
+      fromReport: true,
     })
 
-    // 3. Log to activity
-    const reporter = await users.findOne({ _id: vote.reporterId })
+    // 3. Log activity
     const reportedUser = await users.findOne({ _id: vote.reportedUserId })
 
     await activity.insertOne({

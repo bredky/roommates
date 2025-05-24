@@ -38,8 +38,13 @@ export async function POST(req: Request) {
     imageUri: body.imageUri,
     description: body.description || '',
     delayHours: body.delayHours || 0,
-    votes: [], // { userId: ObjectId, vote: 'yes' | 'no' }
-    voters: [], // userIds who voted
+    votes: [
+        {
+          userId: user._id,
+          vote: 'yes', // ✅ Reporter auto-votes yes
+        },
+      ],
+    voters: [user._id.toString()], // userIds who voted
     createdAt: new Date(),
   }
 

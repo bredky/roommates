@@ -75,7 +75,8 @@ export async function POST(req: Request) {
       customDays: cycle === 'custom' ? customDays : null,
       completedAt: null,
       history: [],
-      overduePoints: 0
+      overduePoints: 0,
+      fromReport: false
     }
 
     const result = await tasks.insertOne(taskDoc)
