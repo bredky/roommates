@@ -106,7 +106,20 @@ export default function SwipeableTaskCard({ task, onComplete, onDelete }) {
       <PanGestureHandler onGestureEvent={gestureHandler}>
         <Animated.View style={[styles.card, animatedStyle]}>
           <Text style={styles.name}>{task.name}</Text>
-          <Text style={styles.due}>Due in {timeUntil()}</Text>
+          {task.fromReport ? (
+                        (() => {
+                          const pointDueIn = (new Date(task.pointDeadline).getTime() - new Date().getTime()) / (1000 * 60 * 60)
+                          const fullDueIn = (new Date(task.expiryDeadline).getTime() - new Date().getTime()) / (1000 * 60 * 60)
+          
+                          return (
+                            <Text style={styles.due}>
+                              Point in {Math.ceil(pointDueIn)}h, Deadline in {Math.ceil(fullDueIn)}h
+                            </Text>
+                          )
+                        })()
+                      ) : (
+                        <Text style={styles.due}>Due in {timeUntil()}</Text>
+                      )}
         </Animated.View>
       </PanGestureHandler>
     </View>

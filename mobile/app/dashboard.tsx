@@ -290,7 +290,7 @@ export default function Dashboard() {
         <Text style={styles.icon} onPress={() => router.push('/report/camera')}>📸</Text>
         <Text style={[styles.icon, styles.activeIcon]}>🟡</Text>
         <Text style={styles.icon} onPress={() => router.push('/household')}>🏠</Text>
-        <Text style={styles.icon}>⚙️</Text>
+        <Text style={styles.icon} onPress={() => router.push('/logout')}>⚙️</Text>
       </View>
       </View>
   )

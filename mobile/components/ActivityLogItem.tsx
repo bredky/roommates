@@ -1,8 +1,9 @@
 import React from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet, Image } from 'react-native'
 
 export default function ActivityLogItem({ activity }) {
-  const { user, type, taskName, points, timestamp, deletedBy } = activity
+    const { user, type, taskName, points, timestamp, deletedBy, imageUri, description } = activity
+
 
   const initials = user?.name
     ?.split(' ')
@@ -22,6 +23,7 @@ export default function ActivityLogItem({ activity }) {
     const days = Math.floor(hours / 24)
     return `${days}d ago`
   }
+  console.log('activity.type:', activity.type)
 
   let message = ''
   switch (type) {
@@ -40,6 +42,9 @@ export default function ActivityLogItem({ activity }) {
     case 'taskReassigned':
       message = `‘${taskName}’ was reassigned to ${user.name}`
       break
+    case 'reportResolved':
+      message = `POINTSSSS 💥 Task created for ${user.name} – ${description}`
+      break  
     default:
       message = 'Unknown activity'
   }
@@ -49,9 +54,22 @@ export default function ActivityLogItem({ activity }) {
       <View style={styles.initialsBubble}>
         <Text style={styles.initialsText}>{initials}</Text>
       </View>
+
       <View style={styles.messageBlock}>
         <Text style={styles.message}>{message}</Text>
         <Text style={styles.timestamp}>{timeAgo(timestamp)}</Text>
+
+        {/* ✅ Optional image display for reportResolved */}
+        {type === 'reportResolved' && imageUri && (
+          <View style={styles.imageBlock}>
+            <Text style={styles.imageLabel}>🖼️ Reported Mess:</Text>
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          </View>
+        )}
       </View>
     </View>
   )
@@ -64,7 +82,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   initialsBubble: {
     backgroundColor: '#000',
@@ -91,5 +109,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+  },
+  imageBlock: {
+    marginTop: 10,
+  },
+  imageLabel: {
+    fontSize: 12,
+    color: '#444',
+    marginBottom: 4,
+  },
+  image: {
+    width: '100%',
+    height: 180,
+    borderRadius: 8,
+    backgroundColor: '#ccc',
   },
 })

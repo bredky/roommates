@@ -98,9 +98,23 @@ export default function NonOwnedTaskCard({ task, onDelete }) {
               <Text style={styles.initialsText}>{initials}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{task.name}</Text>
+            <Text style={styles.name}>{task.name}</Text>
+            {task.fromReport ? (
+              (() => {
+                const pointDueIn = (new Date(task.pointDeadline).getTime() - new Date().getTime()) / (1000 * 60 * 60)
+                const fullDueIn = (new Date(task.expiryDeadline).getTime() - new Date().getTime()) / (1000 * 60 * 60)
+
+                return (
+                  <Text style={styles.due}>
+                    Point in {Math.ceil(pointDueIn)}h, Deadline in {Math.ceil(fullDueIn)}h
+                  </Text>
+                )
+              })()
+            ) : (
               <Text style={styles.due}>Due in {timeUntil()}</Text>
-            </View>
+            )}
+          </View>
+
           </View>
         </Animated.View>
       </PanGestureHandler>

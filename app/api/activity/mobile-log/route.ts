@@ -29,6 +29,8 @@ export async function POST(req: Request) {
     taskName: body.taskName,
     deletedBy: body.deletedBy,
     points: body.points,
+    imageUri: body.imageUri || null,        // ✅ add this
+    description: body.description || '',
     timestamp: new Date(),
     user: {
       name: user.name,

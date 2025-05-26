@@ -84,34 +84,43 @@ export async function POST(req: Request) {
     const deadline = new Date()
     deadline.setHours(deadline.getHours() + vote.delayHours)
 
+    const now = new Date()
+    const pointDeadline = new Date(now.getTime() + vote.delayHours * 60 * 60 * 1000)
+    const expiryDeadline = new Date(pointDeadline.getTime() + 24 * 60 * 60 * 1000)
+
     await tasks.insertOne({
       name: 'Clean reported mess',
       householdId: vote.householdId,
       assignedTo: vote.reportedUserId,
-      assignedAt: new Date(),
+      assignedAt: now,
       completed: false,
       cycle: 'single',
       completedAt: null,
       history: [],
-      overduePoints: 0, 
+      overduePoints: 0,
       fromReport: true,
+      pointDeadline,        // 🔥 custom field
+      expiryDeadline,       // 🔥 custom field
     })
+
 
     // 3. Log activity
     const reportedUser = await users.findOne({ _id: vote.reportedUserId })
 
-    await activity.insertOne({
-      type: 'pointAssigned',
-      taskName: 'Clean reported mess',
-      points: 1,
-      deletedBy: null,
-      timestamp: new Date(),
-      user: {
-        name: reportedUser?.name || 'Unknown',
-        email: reportedUser?.email || 'Unknown',
-      },
-      householdId: vote.householdId,
-    })
+await activity.insertOne({
+  type: 'reportResolved',
+  taskName: 'Clean reported mess',
+  points: 1,
+  image: vote.imageUri || null, // assuming you stored image in the vote
+  description: vote.description || '', // assuming description is stored too
+  deletedBy: null,
+  timestamp: new Date(),
+  user: {
+    name: reportedUser?.name || 'Unknown',
+    email: reportedUser?.email || 'Unknown',
+  },
+  householdId: vote.householdId,
+})
   }
 
   return NextResponse.json({ message: 'Vote recorded' }, { status: 200 })
