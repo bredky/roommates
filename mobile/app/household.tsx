@@ -220,6 +220,9 @@ export default function Household() {
               <TouchableOpacity onPress={() => alert('🚨 Report feature coming soon!')} style={styles.actionButton}>
                 <Text style={styles.buttonText}>🚨 Report</Text>
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/ledger')} style={styles.actionButton}>
+                <Text style={styles.buttonText}>📒 Ledger</Text>
+              </TouchableOpacity>
             </View>
           </View>
 

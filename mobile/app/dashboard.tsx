@@ -43,7 +43,7 @@ export default function Dashboard() {
   const router = useRouter()
   const nameList = members.map((m) => m.name)
   const initialsMap = generateInitialsStable(nameList)
-  
+
   useEffect(() => {
     const load = async () => {
       const token = await SecureStore.getItemAsync('token')
@@ -58,6 +58,12 @@ export default function Dashboard() {
         fetchTasks()
         fetchMembers()
       }
+      await fetch(`${API_BASE}/api/household/reset`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+})
     }
     load()
   }, [])

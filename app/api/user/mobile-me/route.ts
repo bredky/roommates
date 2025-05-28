@@ -35,7 +35,9 @@ export async function GET(req: Request) {
       email: user.email,
       householdId: user.householdId || null,
       points: user.points || 0,
+      lastWeekPoints: user.lastWeekPoints || 0,
       joinCode,
+      
     })
   } catch (err) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })

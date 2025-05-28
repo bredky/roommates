@@ -26,11 +26,13 @@ export async function POST(req: Request) {
       joinCode,
       members: [user._id],
       createdAt: new Date(),
+      nextReset: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     })
 
     await users.updateOne(
       { _id: user._id },
       { $set: { householdId: household.insertedId } }
+      
     )
 
     return NextResponse.json({ joinCode })
