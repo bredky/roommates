@@ -18,12 +18,27 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Not in household' }, { status: 400 })
     }
 
+    // Get all members for name mapping
+    const householdUsers = await users.find({ householdId: user.householdId }).toArray()
+    const userMap = Object.fromEntries(householdUsers.map(u => [u._id.toString(), u.name]))
+
+    // Fetch all ledger entries involving the user
     const logs = await ledger.find({
       householdId: user.householdId,
-      fromUser: user._id,
+      $or: [
+        { fromUser: user._id },
+        { toUser: user._id }
+      ]
     }).sort({ timestamp: -1 }).toArray()
 
-    return NextResponse.json(logs)
+    // Attach names
+    const enrichedLogs = logs.map(log => ({
+      ...log,
+      fromName: userMap[log.fromUser?.toString()] || 'Someone',
+      toName: userMap[log.toUser?.toString()] || 'Someone'
+    }))
+
+    return NextResponse.json(enrichedLogs)
 
   } catch (err) {
     console.error('Ledger history fetch error:', err)

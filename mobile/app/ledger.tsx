@@ -45,10 +45,31 @@ export default function LedgerPage() {
         name: p.name || `Roommate ${i + 1}`,
         amount: p.amount
       })),
-      history: history.map((h: any, i: number) => ({
-        id: h._id || `h${i}`,
-        text: `🪷 ${new Date(h.timestamp).toLocaleDateString()} - ${h.reason} - $${h.amount}`
-      })),
+      history: history.map((h: any, i: number) => {
+  const date = new Date(h.timestamp).toLocaleDateString()
+  const amount = h.amount.toFixed(2)
+
+  let prefix = '📜'
+  let action = ''
+  const isUserPaying = h.fromUser === user._id
+  const isUserReceiving = h.toUser === user._id
+
+  if (h.reason === 'manual payment') {
+    prefix = '💵'
+    action = isUserPaying
+      ? `You paid ${h.toName || 'someone'}`
+      : `You were paid by ${h.fromName || 'someone'}`
+  } else if (h.reason === '3-point penalty' || h.reason === '5-point penalty') {
+    prefix = '🧾'
+    action = `${h.fromName || 'Someone'} was penalized`
+  }
+
+  return {
+    id: h._id || `h${i}`,
+    text: `${prefix} ${date} — ${action} — $${amount}`,
+  }
+})
+,
       daysUntilReset
     })
   }
