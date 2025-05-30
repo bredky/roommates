@@ -9,6 +9,8 @@ import SwipeableTaskCard from '../components/SwipeableTaskCard'
 import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
 import NonOwnedTaskCard from '../components/NonOwnedTaskCard'
 import ActivityLogItem from '../components/ActivityLogItem'
+import LoadingScreen from '../components/LoadingScreen'
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 
 const API_BASE = 'http://192.168.1.208:3000'
 
@@ -20,7 +22,7 @@ export default function Household() {
   const [openVotes, setOpenVotes] = useState<any[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [showAddTaskModal, setShowAddTaskModal] = useState(false)
-
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   const fetchUserData = async () => {
@@ -78,9 +80,14 @@ export default function Household() {
     setRefreshing(false)
   }
 
-  useEffect(() => {
-    handleRefresh()
-  }, [])
+useEffect(() => {
+  const init = async () => {
+    await handleRefresh()
+    setLoading(false)
+  }
+  init()
+}, [])
+
 
   const markTaskDone = async (task: any) => {
     const token = await SecureStore.getItemAsync('token')
@@ -180,8 +187,11 @@ export default function Household() {
   const userTasks = tasks.filter((t) => !t.completed && t.assignedTo?.email === user?.email)
   const othersTasks = tasks.filter((t) => !t.completed && t.assignedTo?.email !== user?.email)
   const completedTasks = tasks.filter((t) => t.completed)
+    if (loading) return <LoadingScreen />
+
 
   return (
+    
     <View style={{ flex: 1, backgroundColor: '#FFE600' }}>
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView

@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router'
 import { generateInitialsStable } from '../lib/utils'
 import { useAppStore } from '../lib/UseAppStore' 
 import LoadingScreen from '../components/LoadingScreen' // adjust the path if needed
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
 
 
 
@@ -237,7 +238,10 @@ useEffect(() => {
   }
   if (loading) return <LoadingScreen />
 
+
+
   return (
+    
     <View style={{ flex: 1, backgroundColor: '#FFE600' }}>
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFE600' }}>
       <ScrollView

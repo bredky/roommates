@@ -1,7 +1,14 @@
 // components/ui/LoadingScreen.tsx
 import React, { useMemo } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
-
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
+import { useEffect } from 'react'
 
 export default function LoadingScreen() {
 // lib/constants/quipData.ts
@@ -22,13 +29,29 @@ const quips = [
     return quips[index]
   }, [])
 
+    const bounce = useSharedValue(0)
+
+  useEffect(() => {
+    bounce.value = withRepeat(
+      withSequence(
+        withTiming(-10, { duration: 300 }),
+        withTiming(0, { duration: 300 })
+      ),
+      -1,
+      true
+    )
+  }, [])
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: bounce.value }],
+  }))
+
   return (
     <View style={styles.container}>
       {/* Mascot animation goes here */}
-      <View style={styles.mascot}>
-        {/* Replace this with your mascot animation component */}
+      <Animated.View style={[styles.mascot, animatedStyle]}>
         <Text style={styles.mascotText}>🐾</Text>
-      </View>
+      </Animated.View>
       <Text style={styles.quip}>{quip}</Text>
     </View>
   )
