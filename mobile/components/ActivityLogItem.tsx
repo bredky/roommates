@@ -45,6 +45,8 @@ export default function ActivityLogItem({ activity }) {
     case 'reportResolved':
       message = `POINTSSSS 💥 Task created for ${user.name} – ${description}`
       break  
+    case 'reportTaskMissed':
+      message = `${user.name} missed a reported task: ‘${taskName}’`
     default:
       message = 'Unknown activity'
   }

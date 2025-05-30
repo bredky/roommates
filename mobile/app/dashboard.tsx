@@ -8,6 +8,8 @@ import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard
 import { useRouter } from 'expo-router'
 import { generateInitialsStable } from '../lib/utils'
 import { useAppStore } from '../lib/UseAppStore' 
+import LoadingScreen from '../components/LoadingScreen' // adjust the path if needed
+
 
 
 import {
@@ -43,30 +45,33 @@ export default function Dashboard() {
   const router = useRouter()
   const nameList = members.map((m) => m.name)
   const initialsMap = generateInitialsStable(nameList)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const load = async () => {
-      const token = await SecureStore.getItemAsync('token')
-      const res = await fetch(`${API_BASE}/api/user/mobile-me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      setUser(data)
-      if (data.householdId) {
-        setJoinCode(data.joinCode)
-        setInHousehold(true)
-        fetchTasks()
-        fetchMembers()
-      }
-      await fetch(`${API_BASE}/api/household/reset`, {
-  method: 'POST',
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-})
+useEffect(() => {
+  const load = async () => {
+    const token = await SecureStore.getItemAsync('token')
+    const res = await fetch(`${API_BASE}/api/user/mobile-me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json()
+    setUser(data)
+
+    if (data.householdId) {
+      setJoinCode(data.joinCode)
+      setInHousehold(true)
+      await Promise.all([fetchTasks(), fetchMembers()])
     }
-    load()
-  }, [])
+
+    await fetch(`${API_BASE}/api/household/reset`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    setLoading(false) // 👈 set to false only after everything is fetched
+  }
+
+  load()
+}, [])
 
   const fetchTasks = async () => {
     const token = await SecureStore.getItemAsync('token')
@@ -230,6 +235,7 @@ export default function Dashboard() {
     if (hours >= 24) return `${Math.floor(hours / 24)}d`
     return `${hours}h`
   }
+  if (loading) return <LoadingScreen />
 
   return (
     <View style={{ flex: 1, backgroundColor: '#FFE600' }}>
