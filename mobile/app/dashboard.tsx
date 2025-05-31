@@ -27,59 +27,61 @@ const API_BASE = 'http://192.168.1.208:3000'
 
 export default function Dashboard() {
   const {
-  user,
-  fetchUser,
-  checkForUpdates: checkUserUpdates,
-  loading: userLoading,
-} = useUserStore()
+    user,
+    fetchUser,
+    checkForUpdates: checkUserUpdates,
+    loading: userLoading,
+  } = useUserStore()
   const [joinCode, setJoinCode] = useState('')
   const [inputCode, setInputCode] = useState('')
   const [inHousehold, setInHousehold] = useState(false)
   const {
-  members,
-  fetchMembers,
-  checkForUpdates: checkMemberUpdates,
-  loading: memberLoading,
-} = useMemberStore()
+    members,
+    fetchMembers,
+    checkForUpdates: checkMemberUpdates,
+    loading: memberLoading,
+  } = useMemberStore()
   const [selectedTask, setSelectedTask] = useState('')
   const [cycle, setCycle] = useState('weekly')
   const [customDays, setCustomDays] = useState('')
   const [showCycleSelect, setShowCycleSelect] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false)
   const router = useRouter()
   const nameList = members.map((m) => m.name)
   const initialsMap = generateInitialsStable(nameList)
   const { tasks, fetchTasks, checkForUpdates, loading: taskLoading } = useTaskStore()
-  
-useEffect(() => {
-  const load = async () => {
-    await fetchUser()
 
-    if (user?.householdId) {
-      setJoinCode(user.joinCode)
-      setInHousehold(true)
-      await Promise.all([fetchMembers(), fetchTasks()])
+  useEffect(() => {
+    const load = async () => {
+      await fetchUser()
+
+      if (user?.householdId) {
+        setJoinCode(user.joinCode)
+        setInHousehold(true)
+        await Promise.all([fetchMembers(), fetchTasks()])
+      }
+
+      const token = await SecureStore.getItemAsync('token')
+      await fetch(`${API_BASE}/api/household/reset`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      setLoading(false)
+      setInitialLoadComplete(true)
     }
 
-    const token = await SecureStore.getItemAsync('token')
-    await fetch(`${API_BASE}/api/household/reset`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    load()
 
-    setLoading(false)
-  }
+    const interval = setInterval(() => {
+      checkUserUpdates()
+      checkMemberUpdates()
+    }, 30000)
 
-  load()
-
-  const interval = setInterval(() => {
-    checkUserUpdates()
-    checkMemberUpdates()
-  }, 30000)
-
-  return () => clearInterval(interval)
-}, [])
+    return () => clearInterval(interval)
+  }, [])
 
   const handleAddTask = async () => {
     const token = await SecureStore.getItemAsync('token')
@@ -118,8 +120,9 @@ useEffect(() => {
     })
   }
 
-  const markTaskDone = async (task: any) => {
+  const markTaskDone = async (task) => {
     const token = await SecureStore.getItemAsync('token')
+    useTaskStore.getState().completeTask(task._id)
 
     await fetch(`${API_BASE}/api/task/mobile/complete`, {
       method: 'POST',
@@ -147,12 +150,11 @@ useEffect(() => {
         timestamp: new Date().toISOString(),
       }),
     })
-
-    await fetchTasks()
   }
 
-  const deleteTask = async (task: any) => {
+  const deleteTask = async (task) => {
     const token = await SecureStore.getItemAsync('token')
+    useTaskStore.getState().removeTask(task._id)
 
     await fetch(`${API_BASE}/api/task/mobile/delete`, {
       method: 'POST',
@@ -176,31 +178,6 @@ useEffect(() => {
         timestamp: new Date().toISOString(),
       }),
     })
-
-    await fetchTasks()
-  }
-
-  const handleJoinHousehold = async () => {
-    const token = await SecureStore.getItemAsync('token')
-    const res = await fetch(`${API_BASE}/api/household/mobile-join`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ joinCode: inputCode.trim() }),
-    })
-    const data = await res.json()
-
-    if (res.ok) {
-      setJoinCode(data.joinCode)
-      setInHousehold(true)
-      setInputCode('')
-      await fetchMembers()
-      await fetchTasks()
-    } else {
-      Alert.alert('Error', data.error || 'Invalid join code')
-    }
   }
 
   const handleRefresh = async () => {
@@ -210,14 +187,13 @@ useEffect(() => {
   }
 
   const activeTasks = tasks.filter(
-    (t: any) => !t.completed && t.assignedTo?.email === user?.email
+    (t) => !t.completed && t.assignedTo?.email === user?.email
   )
   const completedTasks = tasks.filter(
-    (t: any) => t.completed && t.assignedTo?.email === user?.email
+    (t) => t.completed && t.assignedTo?.email === user?.email
   )
 
-  if (loading || taskLoading || userLoading || memberLoading) return <LoadingScreen />
-
+  if (!initialLoadComplete) return <LoadingScreen />
   return (
     <View style={{ flex: 1, backgroundColor: '#FFE600' }}>
       <SafeAreaView style={{ flex: 1, backgroundColor: '#FFE600' }}>

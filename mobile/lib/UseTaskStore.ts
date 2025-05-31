@@ -23,6 +23,8 @@ type State = {
   fetchTasks: () => Promise<void>
   checkForUpdates: () => Promise<void>
   forceRefresh: () => Promise<void>
+  completeTask: (id: string) => void     // <-- Add this
+  removeTask: (id: string) => void
 }
 
 export const useTaskStore = create<State>((set, get) => ({
@@ -71,7 +73,19 @@ export const useTaskStore = create<State>((set, get) => ({
       console.error('Failed to check for updates:', error)
     }
   },
+  completeTask: (id) => {
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task._id === id ? { ...task, completed: true } : task
+      ),
+    }))
+  },
 
+  removeTask: (id) => {
+    set((state) => ({
+      tasks: state.tasks.filter((task) => task._id !== id),
+    }))
+  },
   // Hard reset and reload
   forceRefresh: async () => {
     set({ lastFetched: null })
