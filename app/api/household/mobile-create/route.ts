@@ -31,7 +31,11 @@ export async function POST(req: Request) {
 
     await users.updateOne(
       { _id: user._id },
-      { $set: { householdId: household.insertedId } }
+      { $set: { householdId: household.insertedId,
+        updatedAt: new Date() 
+      }
+      
+    }
       
     )
 

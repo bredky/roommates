@@ -27,12 +27,18 @@ export async function POST(req: Request) {
 
     await households.updateOne(
       { _id: household._id },
-      { $addToSet: { members: user._id } }
+      { $addToSet: { members: user._id },
+    $set: {updatedAt: new Date() }
+    }
+      
     )
 
     await users.updateOne(
       { _id: user._id },
-      { $set: { householdId: household._id } }
+      { $set: { householdId: household._id,
+        updatedAt: new Date() 
+       } }
+
     )
 
     return NextResponse.json({ message: 'Joined successfully', joinCode })

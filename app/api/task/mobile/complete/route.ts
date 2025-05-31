@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   await tasks.updateOne(
     { _id: task._id },
     {
-      $set: { completed: true, completedAt: now },
+      $set: { completed: true, completedAt: now, updatedAt: new Date()},
       $push: {
         history: {
           user: user._id,

@@ -135,6 +135,7 @@ export async function POST() {
             completed: false,
             completedAt: null,
             overduePoints: 0,
+            updatedAt: new Date(),
           },
           $push: {
             history: {
@@ -179,7 +180,13 @@ export async function POST() {
 
       if (newPoints > 0) {
         await users.updateOne({ _id: user._id }, { $inc: { points: newPoints } })
-        await tasks.updateOne({ _id: task._id }, { $inc: { overduePoints: newPoints } })
+        await tasks.updateOne(
+          { _id: task._id },
+          {
+            $set: { updatedAt: new Date() },
+            $inc: { overduePoints: newPoints }
+          }
+        )
 
         await activity.insertOne({
           type: 'pointGiven',
@@ -234,6 +241,7 @@ export async function POST() {
               completed: false,
               completedAt: null,
               overduePoints: 0,
+              updatedAt: new Date()
             },
             $push: {
               history: {

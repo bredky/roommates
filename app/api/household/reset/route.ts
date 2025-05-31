@@ -33,7 +33,9 @@ export async function POST(req: Request) {
         // Store last week’s points
         await users.updateOne(
           { _id: member._id },
-          { $set: { lastWeekPoints: currentPoints, points: 0 } }
+          { $set: { lastWeekPoints: currentPoints, points: 0,
+          updatedAt: new Date() 
+        }}
         )
 
         if (currentPoints >= 3) {

@@ -83,7 +83,8 @@ export async function POST(req: Request) {
 
     await households.updateOne(
       { _id: user.householdId },
-      { $push: { tasks: result.insertedId } }
+      { $push: { tasks: result.insertedId },
+        $set: { updatedAt: new Date() } }
     )
 
     const assignee = await users.findOne({ _id: new ObjectId(selectedUserId) })

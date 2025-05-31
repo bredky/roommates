@@ -37,6 +37,8 @@ export async function GET(req: Request) {
       points: user.points || 0,
       lastWeekPoints: user.lastWeekPoints || 0,
       joinCode,
+      updatedAt: user.updatedAt || null
+    
       
     })
   } catch (err) {

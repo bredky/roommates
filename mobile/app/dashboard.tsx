@@ -3,101 +3,83 @@
 import { useEffect, useState } from 'react'
 import { Picker } from '@react-native-picker/picker'
 import { RefreshControl } from 'react-native'
-import SwipeableTaskCard from '../components/SwipeableTaskCard' // adjust path if needed
+import SwipeableTaskCard from '../components/SwipeableTaskCard'
 import SwipeableCompletedTaskCard from '../components/SwipeableCompletedTaskCard'
 import { useRouter } from 'expo-router'
 import { generateInitialsStable } from '../lib/utils'
-import { useAppStore } from '../lib/UseAppStore' 
-import LoadingScreen from '../components/LoadingScreen' // adjust the path if needed
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'
-
-
-
+import { useAppStore } from '../lib/UseAppStore'
+import LoadingScreen from '../components/LoadingScreen'
+import { useTaskStore } from '../lib/UseTaskStore'
+import { useUserStore } from '../lib/useUserStore'
+import { useMemberStore } from '../lib/useMemberStore'
 import {
   View,
   Text,
   TextInput,
-  Button,
-  TouchableOpacity,
-  FlatList,
-  ScrollView,
   Alert,
+  ScrollView,
   StyleSheet,
 } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-const API_BASE = 'http://192.168.1.208:3000' // replace with your IP
-
+const API_BASE = 'http://192.168.1.208:3000'
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null)
+  const {
+  user,
+  fetchUser,
+  checkForUpdates: checkUserUpdates,
+  loading: userLoading,
+} = useUserStore()
   const [joinCode, setJoinCode] = useState('')
   const [inputCode, setInputCode] = useState('')
   const [inHousehold, setInHousehold] = useState(false)
-  const [members, setMembers] = useState<any[]>([])
-  const [tasks, setTasks] = useState<any[]>([])
+  const {
+  members,
+  fetchMembers,
+  checkForUpdates: checkMemberUpdates,
+  loading: memberLoading,
+} = useMemberStore()
   const [selectedTask, setSelectedTask] = useState('')
   const [cycle, setCycle] = useState('weekly')
   const [customDays, setCustomDays] = useState('')
   const [showCycleSelect, setShowCycleSelect] = useState(false)
-  const [customTaskInput, setCustomTaskInput] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
   const nameList = members.map((m) => m.name)
   const initialsMap = generateInitialsStable(nameList)
-  const [loading, setLoading] = useState(true)
-
+  const { tasks, fetchTasks, checkForUpdates, loading: taskLoading } = useTaskStore()
+  
 useEffect(() => {
   const load = async () => {
-    const token = await SecureStore.getItemAsync('token')
-    const res = await fetch(`${API_BASE}/api/user/mobile-me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const data = await res.json()
-    setUser(data)
+    await fetchUser()
 
-    if (data.householdId) {
-      setJoinCode(data.joinCode)
+    if (user?.householdId) {
+      setJoinCode(user.joinCode)
       setInHousehold(true)
-      await Promise.all([fetchTasks(), fetchMembers()])
+      await Promise.all([fetchMembers(), fetchTasks()])
     }
 
+    const token = await SecureStore.getItemAsync('token')
     await fetch(`${API_BASE}/api/household/reset`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     })
 
-    setLoading(false) // 👈 set to false only after everything is fetched
+    setLoading(false)
   }
 
   load()
+
+  const interval = setInterval(() => {
+    checkUserUpdates()
+    checkMemberUpdates()
+  }, 30000)
+
+  return () => clearInterval(interval)
 }, [])
-
-  const fetchTasks = async () => {
-    const token = await SecureStore.getItemAsync('token')
-  
-    try {
-      const res = await fetch(`${API_BASE}/api/task/mobile/get`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-  
-      const data = await res.json()
-  
-      setTasks(data.tasks || [])
-    } catch (err) {
-    }
-  }
-  
-
-  const fetchMembers = async () => {
-    const token = await SecureStore.getItemAsync('token')
-    const res = await fetch(`${API_BASE}/api/household/mobile-members`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })      
-    const data = await res.json()
-    setMembers(data.members || [])
-  }
 
   const handleAddTask = async () => {
     const token = await SecureStore.getItemAsync('token')
@@ -113,29 +95,32 @@ useEffect(() => {
         customDays: cycle === 'custom' ? parseFloat(customDays) : null,
       }),
     })
+
     if (res.ok) {
-      fetchTasks()
+      await fetchTasks()
       setSelectedTask('')
       setCycle('weekly')
       setCustomDays('')
       setShowCycleSelect(false)
     }
+
     await fetch(`${API_BASE}/api/activity/mobile-log`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          type: 'taskCreated',
-          taskName: selectedTask,
-          timestamp: new Date().toISOString(),
-        }),
-      })
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'taskCreated',
+        taskName: selectedTask,
+        timestamp: new Date().toISOString(),
+      }),
+    })
   }
 
   const markTaskDone = async (task: any) => {
     const token = await SecureStore.getItemAsync('token')
+
     await fetch(`${API_BASE}/api/task/mobile/complete`, {
       method: 'POST',
       headers: {
@@ -144,14 +129,12 @@ useEffect(() => {
       },
       body: JSON.stringify({ taskId: task._id }),
     })
-  
+
     await fetch(`${API_BASE}/api/task/mobile/reassign`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
-  
+
     await fetch(`${API_BASE}/api/activity/mobile-log`, {
       method: 'POST',
       headers: {
@@ -164,13 +147,13 @@ useEffect(() => {
         timestamp: new Date().toISOString(),
       }),
     })
-  
-    fetchTasks()
+
+    await fetchTasks()
   }
-  
 
   const deleteTask = async (task: any) => {
     const token = await SecureStore.getItemAsync('token')
+
     await fetch(`${API_BASE}/api/task/mobile/delete`, {
       method: 'POST',
       headers: {
@@ -179,7 +162,7 @@ useEffect(() => {
       },
       body: JSON.stringify({ taskId: task._id }),
     })
-  
+
     await fetch(`${API_BASE}/api/activity/mobile-log`, {
       method: 'POST',
       headers: {
@@ -193,11 +176,10 @@ useEffect(() => {
         timestamp: new Date().toISOString(),
       }),
     })
-  
-    fetchTasks()
+
+    await fetchTasks()
   }
-  
-  
+
   const handleJoinHousehold = async () => {
     const token = await SecureStore.getItemAsync('token')
     const res = await fetch(`${API_BASE}/api/household/mobile-join`, {
@@ -209,106 +191,114 @@ useEffect(() => {
       body: JSON.stringify({ joinCode: inputCode.trim() }),
     })
     const data = await res.json()
+
     if (res.ok) {
       setJoinCode(data.joinCode)
       setInHousehold(true)
       setInputCode('')
-      fetchMembers()
-      fetchTasks()
+      await fetchMembers()
+      await fetchTasks()
     } else {
       Alert.alert('Error', data.error || 'Invalid join code')
     }
   }
+
   const handleRefresh = async () => {
     setRefreshing(true)
-    await fetchTasks()
-    await fetchMembers()
+    await Promise.all([fetchTasks(), fetchMembers()])
     setRefreshing(false)
   }
-  
-  const activeTasks = tasks.filter((t: any) => !t.completed && t.assignedTo?.email === user?.email)
-  const completedTasks = tasks.filter((t: any) => t.completed && t.assignedTo?.email === user?.email)
 
-  const timeUntil = (deadline: Date) => {
-    const now = new Date()
-    const ms = deadline.getTime() - now.getTime()
-    const hours = Math.floor(ms / (1000 * 60 * 60))
-    if (hours >= 24) return `${Math.floor(hours / 24)}d`
-    return `${hours}h`
-  }
-  if (loading) return <LoadingScreen />
+  const activeTasks = tasks.filter(
+    (t: any) => !t.completed && t.assignedTo?.email === user?.email
+  )
+  const completedTasks = tasks.filter(
+    (t: any) => t.completed && t.assignedTo?.email === user?.email
+  )
 
-
+  if (loading || taskLoading || userLoading || memberLoading) return <LoadingScreen />
 
   return (
-    
     <View style={{ flex: 1, backgroundColor: '#FFE600' }}>
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFE600' }}>
-      <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        contentContainerStyle={{ padding: 20 }}
-      >
-        {/* Header */}
-        <Text style={styles.welcome}>👋 Welcome, {user?.name || 'Roomie'}</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#FFE600' }}>
+        <ScrollView
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          contentContainerStyle={{ padding: 20 }}
+        >
+          <Text style={styles.welcome}>👋 Welcome, {user?.name || 'Roomie'}</Text>
 
-        <View style={styles.topRow}>
-          <Text style={styles.mascot}>🐱</Text>
+          <View style={styles.topRow}>
+            <Text style={styles.mascot}>🐱</Text>
 
-          <View style={styles.leaderboard}>
-            <Text style={styles.leaderboardTitle}>Whose eating it</Text>
-            {members.map((m, i) => (
-              <View key={i} style={[styles.rankCard, i === 0 && styles.rankCardTop]}>
-                <View style={styles.rankCircle}>
-                  <Text style={styles.rankNumber}>{i + 1}</Text>
+            <View style={styles.leaderboard}>
+              <Text style={styles.leaderboardTitle}>Whose eating it</Text>
+              {members.map((m, i) => (
+                <View
+                  key={i}
+                  style={[styles.rankCard, i === 0 && styles.rankCardTop]}
+                >
+                  <View style={styles.rankCircle}>
+                    <Text style={styles.rankNumber}>{i + 1}</Text>
+                  </View>
+                  <View style={styles.initials}>
+                    <Text style={styles.initialsText}>
+                      {initialsMap[m.name] ||
+                        m.name.slice(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.memberName}>
+                    {m.name === user?.name ? `${m.name} (You)` : m.name}
+                  </Text>
+                  <Text style={styles.points}>{m.points || 0} pts</Text>
                 </View>
-                <View style={styles.initials}>
-                <Text style={styles.initialsText}>
-                    {initialsMap[m.name] || m.name.slice(0, 2).toUpperCase()}
-                </Text>
-                </View>
-                <Text style={styles.memberName}>{m.name === user?.name ? `${m.name} (You)` : m.name}</Text>
-                <Text style={styles.points}>{m.points || 0} pts</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
 
-        {/* Tasks */}
-        <Text style={styles.sectionTitle}>📋 Your Tasks</Text>
-        {activeTasks.map((task) => (
+          <Text style={styles.sectionTitle}>📋 Your Tasks</Text>
+          {activeTasks.map((task) => (
             <SwipeableTaskCard
-                key={task._id}
-                task={task}
-                onComplete={(id) => markTaskDone(task)}
-                onDelete={(id) => deleteTask(task)}
-            />
-            ))}
-
-
-        {/* Completed */}
-        {completedTasks.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>✅ Completed</Text>
-            {completedTasks.map((task) => (
-              <SwipeableCompletedTaskCard
               key={task._id}
               task={task}
-              onDelete={(id) => deleteTask(task)}
+              onComplete={() => markTaskDone(task)}
+              onDelete={() => deleteTask(task)}
             />
-            ))}
-          </>
-        )}
-      </ScrollView>
-    </SafeAreaView>
-    {/* Footer Nav */}
+          ))}
+
+          {completedTasks.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>✅ Completed</Text>
+              {completedTasks.map((task) => (
+                <SwipeableCompletedTaskCard
+                  key={task._id}
+                  task={task}
+                  onDelete={() => deleteTask(task)}
+                />
+              ))}
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+
       <View style={styles.footer}>
         <Text style={styles.icon}>🔍</Text>
-        <Text style={styles.icon} onPress={() => router.push('/report/camera')}>📸</Text>
+        <Text
+          style={styles.icon}
+          onPress={() => router.push('/report/camera')}
+        >
+          📸
+        </Text>
         <Text style={[styles.icon, styles.activeIcon]}>🟡</Text>
-        <Text style={styles.icon} onPress={() => router.push('/household')}>🏠</Text>
-        <Text style={styles.icon} onPress={() => router.push('/logout')}>⚙️</Text>
+        <Text style={styles.icon} onPress={() => router.push('/household')}>
+          🏠
+        </Text>
+        <Text style={styles.icon} onPress={() => router.push('/logout')}>
+          ⚙️
+        </Text>
       </View>
-      </View>
+    </View>
   )
 }
 

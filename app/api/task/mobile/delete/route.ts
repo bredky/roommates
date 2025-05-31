@@ -22,7 +22,9 @@ export async function POST(req: Request) {
   await tasks.deleteOne({ _id: new ObjectId(taskId) })
   await households.updateOne(
     { _id: user.householdId },
-    { $pull: { tasks: new ObjectId(taskId) } }
+    { $pull: { tasks: new ObjectId(taskId) },
+      $set: {updatedAt: new Date()}
+  }
   )
 
   return NextResponse.json({ message: 'Task deleted' })
