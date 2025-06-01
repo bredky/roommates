@@ -74,12 +74,6 @@ export async function POST(req: Request) {
 
   // Handle result if resolved
   if (shouldResolve && majorityDecision === 'yes') {
-    // 1. Assign point to reported user
-    await users.updateOne(
-      { _id: vote.reportedUserId },
-      { $inc: { points: 1 } }
-    )
-
     // 2. Create follow-up task
     const deadline = new Date()
     deadline.setHours(deadline.getHours() + vote.delayHours)
