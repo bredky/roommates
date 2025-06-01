@@ -1,4 +1,3 @@
-// /mobile/app/dashboard.tsx
 
 import { useEffect, useState } from 'react'
 import { Picker } from '@react-native-picker/picker'
@@ -22,6 +21,8 @@ import {
 } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
+import { useCallback } from 'react'
 
 const API_BASE = 'http://192.168.1.208:3000'
 
@@ -51,17 +52,22 @@ export default function Dashboard() {
   const router = useRouter()
   const nameList = members.map((m) => m.name)
   const initialsMap = generateInitialsStable(nameList)
-  const { tasks, fetchTasks, checkForUpdates, loading: taskLoading } = useTaskStore()
+  const {
+    tasks,
+    fetchTasks,
+    checkForUpdates,
+    loading: taskLoading,
+  } = useTaskStore()
 
   useEffect(() => {
-    const load = async () => {
-      await fetchUser()
+  const load = async () => {
+    setLoading(true)
+    await fetchUser()             // Wait for it to complete
+    const latestUser = useUserStore.getState().user  // Get updated user
 
-      if (user?.householdId) {
-        setJoinCode(user.joinCode)
-        setInHousehold(true)
-        await Promise.all([fetchMembers(), fetchTasks()])
-      }
+    if (latestUser?.householdId) {
+      setJoinCode(latestUser.joinCode)
+      setInHousehold(true)
 
       const token = await SecureStore.getItemAsync('token')
       await fetch(`${API_BASE}/api/household/reset`, {
@@ -69,19 +75,34 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      setLoading(false)
-      setInitialLoadComplete(true)
+      await Promise.all([
+        fetchTasks(),            // ✅ Always fetch on first load
+        fetchMembers()
+      ])
     }
 
-    load()
+    setLoading(false)
+    setInitialLoadComplete(true)
+  }
 
-    const interval = setInterval(() => {
-      checkUserUpdates()
-      checkMemberUpdates()
-    }, 30000)
+  load()
 
-    return () => clearInterval(interval)
+  const interval = setInterval(() => {
+    checkUserUpdates()
+    checkMemberUpdates()
+    checkForUpdates()
+  }, 30000)
+
+  return () => clearInterval(interval)
+}, [])
+
+useFocusEffect(
+  useCallback(() => {
+    fetchUser()
+    fetchTasks()
+    fetchMembers()
   }, [])
+)
 
   const handleAddTask = async () => {
     const token = await SecureStore.getItemAsync('token')
@@ -220,8 +241,7 @@ export default function Dashboard() {
                   </View>
                   <View style={styles.initials}>
                     <Text style={styles.initialsText}>
-                      {initialsMap[m.name] ||
-                        m.name.slice(0, 2).toUpperCase()}
+                      {initialsMap[m.name] || m.name.slice(0, 2).toUpperCase()}
                     </Text>
                   </View>
                   <Text style={styles.memberName}>
