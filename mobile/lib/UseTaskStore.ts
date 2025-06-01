@@ -55,24 +55,34 @@ export const useTaskStore = create<State>((set, get) => ({
   },
 
   // Smart diff check using updatedAt timestamps
-  checkForUpdates: async () => {
-    const { lastFetched, fetchTasks } = get()
-    if (!lastFetched) return fetchTasks()
+checkForUpdates: async () => {
+  const { lastFetched, fetchTasks } = get()
 
-    const token = await SecureStore.getItemAsync('token')
-    try {
-      const res = await fetch(`${API_BASE}/api/task/mobile/updated-since?timestamp=${lastFetched}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
+  // If it's the first load, just fetch everything
+  if (!lastFetched) return fetchTasks()
 
-      if (data?.hasNew) {
-        await fetchTasks()
-      }
-    } catch (error) {
-      console.error('Failed to check for updates:', error)
+  const token = await SecureStore.getItemAsync('token')
+
+  // 🚨 Add this guard to prevent malformed token errors
+  if (!token || token === 'undefined' || token === 'null') {
+    console.warn('⛔ No token found — skipping update check')
+    return
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/task/mobile/updated-since?timestamp=${lastFetched}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const data = await res.json()
+
+    if (data?.hasNew) {
+      await fetchTasks()
     }
-  },
+  } catch (error) {
+    console.error('Failed to check for updates:', error)
+  }
+},
   completeTask: (id) => {
     set((state) => ({
       tasks: state.tasks.map((task) =>

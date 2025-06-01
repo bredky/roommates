@@ -44,18 +44,31 @@ export const useUserStore = create<UserStore>((set, get) => ({
     })
   },
 
-  checkForUpdates: async () => {
-    const { lastFetched, fetchUser } = get()
-    if (!lastFetched) return fetchUser()
+checkForUpdates: async () => {
+  const { lastFetched, fetchUser } = get()
 
-    const token = await SecureStore.getItemAsync('token')
+  if (!lastFetched) return fetchUser()
+
+  const token = await SecureStore.getItemAsync('token')
+
+  // 🛡️ Prevent jwt malformed errors on logout
+  if (!token || token === 'undefined' || token === 'null') {
+    console.warn('⛔ No token found — skipping user update check')
+    return
+  }
+
+  try {
     const res = await fetch(`${API_BASE}/api/user/mobile/updated-since?timestamp=${lastFetched}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
+
     const data = await res.json()
 
-    if (data.hasNew) {
+    if (data?.hasNew) {
       await fetchUser()
     }
-  },
+  } catch (error) {
+    console.error('Failed to check for user updates:', error)
+  }
+}
 }))

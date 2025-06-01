@@ -40,12 +40,20 @@ export const useMemberStore = create<MemberState>((set, get) => ({
       loading: false,
     })
   },
+checkForUpdates: async () => {
+  const { lastFetched, fetchMembers } = get()
 
-  checkForUpdates: async () => {
-    const { lastFetched, fetchMembers } = get()
-    if (!lastFetched) return fetchMembers()
+  if (!lastFetched) return fetchMembers()
 
-    const token = await SecureStore.getItemAsync('token')
+  const token = await SecureStore.getItemAsync('token')
+
+  // 🛡️ Safety guard against invalid tokens
+  if (!token || token === 'undefined' || token === 'null') {
+    console.warn('⛔ No token found — skipping member update check')
+    return
+  }
+
+  try {
     const res = await fetch(`${API_BASE}/api/household/mobile-members/updated-since?timestamp=${lastFetched}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -54,5 +62,8 @@ export const useMemberStore = create<MemberState>((set, get) => ({
     if (data?.hasNew) {
       await fetchMembers()
     }
-  },
+  } catch (error) {
+    console.error('Failed to check for household member updates:', error)
+  }
+}
 }))
