@@ -14,44 +14,47 @@ import * as SecureStore from 'expo-secure-store'
 
 const API_BASE = 'http://192.168.1.208:3000'
 
+// All other imports stay the same
+// REPLACE THIS ENTIRE FUNCTION:
 export default function welcome() {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [isSignup, setIsSignup] = useState(false)
   const [email, setEmail] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
 
   const handleSubmit = async () => {
-    if (!email || !password || (isSignup && !name)) {
-      return Alert.alert('Missing Info', 'Please fill all fields')
+    if (!password || (isSignup && (!email || !name))) {
+      return Alert.alert('Missing Info', 'Please fill all required fields')
     }
-  
+
     try {
       const res = await fetch(`${API_BASE}/api/auth/mobile-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
+          email: email || undefined,
+          phoneNumber: !email ? phoneNumber : undefined,
           password,
           name: isSignup ? name : undefined,
         }),
       })
-  
+
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-  
+
       const token = data.token
       await SecureStore.setItemAsync('token', token)
-  
-      // 🔍 Check if user is already in a household
+
       const meRes = await fetch(`${API_BASE}/api/user/mobile-me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-  
+
       const meData = await meRes.json()
       if (!meRes.ok) throw new Error(meData.error || 'Failed to fetch user info')
-  
+
       if (meData.householdId) {
         router.replace('/dashboard')
       } else {
@@ -93,13 +96,23 @@ export default function welcome() {
       ) : (
         <View style={styles.form}>
           {isSignup && (
-            <TextInput
-              placeholder="Name"
-              value={name}
-              onChangeText={setName}
-              style={styles.input}
-              placeholderTextColor="#999"
-            />
+            <>
+              <TextInput
+                placeholder="Name"
+                value={name}
+                onChangeText={setName}
+                style={styles.input}
+                placeholderTextColor="#999"
+              />
+              <TextInput
+                placeholder="Phone (optional)"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                style={styles.input}
+                keyboardType="phone-pad"
+                placeholderTextColor="#999"
+              />
+            </>
           )}
           <TextInput
             placeholder="Email"

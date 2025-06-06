@@ -5,13 +5,18 @@ import { sign } from 'jsonwebtoken'
 import { ObjectId } from 'mongodb'
 
 export async function POST(req: Request) {
-  const { email, password, name } = await req.json()
+  const { email, phoneNumber, password, name } = await req.json()
   const db = await connectDB()
   const users = db.collection('users')
 
-  const existingUser = await users.findOne({ email })
+  const query: any = email ? { email } : phoneNumber ? { phoneNumber } : null
+  if (!query) {
+    return NextResponse.json({ error: 'Must provide email or phone number' }, { status: 400 })
+  }
 
-  // --- If user exists: login flow
+  const existingUser = await users.findOne(query)
+
+  // LOGIN
   if (existingUser) {
     const isValid = await compare(password, existingUser.password)
     if (!isValid) {
@@ -30,18 +35,32 @@ export async function POST(req: Request) {
         id: existingUser._id,
         name: existingUser.name,
         email: existingUser.email,
+        phoneNumber: existingUser.phoneNumber || null,
         householdId: existingUser.householdId,
         points: existingUser.points || 0,
       },
     })
   }
 
-  // --- If user does not exist & name is provided: signup flow
+  // SIGNUP
   if (!existingUser && name) {
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required to sign up' }, { status: 400 })
+    }
+
+    if (phoneNumber) {
+      const phoneExists = await users.findOne({ phoneNumber })
+      if (phoneExists) {
+        return NextResponse.json({ error: 'Phone number already in use' }, { status: 400 })
+      }
+    }
+
     const hashedPassword = await hash(password, 10)
+
     const result = await users.insertOne({
       name,
       email,
+      phoneNumber: phoneNumber || null,
       password: hashedPassword,
       householdId: null,
       points: 0,
@@ -59,12 +78,12 @@ export async function POST(req: Request) {
         id: result.insertedId,
         name,
         email,
+        phoneNumber: phoneNumber || null,
         householdId: null,
         points: 0,
       },
     })
   }
 
-  // --- If no name provided, treat as failed login
   return NextResponse.json({ error: 'User not found' }, { status: 404 })
 }
